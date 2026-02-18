@@ -16,19 +16,6 @@ out/
 .env
 .env.local
 .env.*.local
-# Python
-venv/
-ml-backend/venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# ML Models
-*.pt
-*.pth
-*.h5
-*.pkl
 
 # Logs
 logs

@@ -671,7 +671,6 @@ export default function App() {
     addToCart(productId);
     setShowCart(true);
   };
-
   const updateCartQty = (productId, qty) => {
     if (qty <= 0) {
       setCart((prev) => {
