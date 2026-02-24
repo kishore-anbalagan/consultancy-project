@@ -31,7 +31,10 @@ const heroImages = [
   'https://img.freepik.com/premium-photo/village-old-farmer-is-working-green-planting-paddy-seeds-weed-out-grass_709167-309.jpg',
 ];
 
-function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange }) {
+function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange, onGoogleContinue, onWhatsAppContinue }) {
+  const [signInError, setSignInError] = useState('');
+  const [signInLoading, setSignInLoading] = useState(false);
+
   return (
     <section
       id="signin"
@@ -157,47 +160,65 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange 
             ))}
           </div>
 
-          <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <button
-              type="button"
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '0.75rem',
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Continue with Google
-            </button>
-            <button
-              type="button"
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '0.75rem',
-                border: '1px solid #e2e8f0',
-                background: '#fff',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Continue with WhatsApp
-            </button>
-          </div>
+          {role !== 'admin' && (
+            <>
+              <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={onGoogleContinue}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Continue with Google
+                </button>
+                <button
+                  type="button"
+                  onClick={onWhatsAppContinue}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    background: '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Continue with WhatsApp
+                </button>
+              </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: '#94a3b8' }}>
-            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-            <span style={{ fontSize: '0.85rem' }}>or use email</span>
-            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-          </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: '#94a3b8' }}>
+                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                <span style={{ fontSize: '0.85rem' }}>or use email</span>
+                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+              </div>
+            </>
+          )}
 
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              onSignIn?.(role);
+              const formData = new FormData(event.currentTarget);
+              const email = String(formData.get('email') || '').trim();
+              const password = String(formData.get('password') || '');
+
+              setSignInError('');
+              setSignInLoading(true);
+              try {
+                await onSignIn?.({ role, email, password });
+              } catch (err) {
+                setSignInError(err.message || 'Sign in failed. Please try again.');
+              } finally {
+                setSignInLoading(false);
+              }
             }}
             style={{ display: 'grid', gap: '1rem' }}
           >
@@ -234,6 +255,7 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange 
 
             <button
               type="submit"
+              disabled={signInLoading}
               style={{
                 padding: '0.85rem 1rem',
                 borderRadius: '0.85rem',
@@ -241,12 +263,19 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange 
                 background: 'linear-gradient(120deg, #16a34a, #0f766e)',
                 color: '#fff',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: signInLoading ? 'not-allowed' : 'pointer',
                 fontSize: '1rem',
+                opacity: signInLoading ? 0.8 : 1,
               }}
             >
-              Sign in as {role === 'admin' ? 'Admin' : 'User'}
+              {signInLoading ? 'Signing in...' : `Sign in as ${role === 'admin' ? 'Admin' : 'User'}`}
             </button>
+
+            {signInError && (
+              <div style={{ color: '#dc2626', fontSize: '0.9rem', fontWeight: 600 }}>
+                {signInError}
+              </div>
+            )}
           </form>
 
           <p style={{ marginTop: '1.5rem', color: '#64748b' }}>
@@ -260,6 +289,7 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange 
 
 function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) {
   const [signUpError, setSignUpError] = useState('');
+  const [signUpLoading, setSignUpLoading] = useState(false);
 
   return (
     <section
@@ -388,11 +418,13 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
           </div>
 
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
               const formData = new FormData(event.currentTarget);
-              const password = formData.get('password');
-              const confirmPassword = formData.get('confirmPassword');
+              const name = String(formData.get('name') || '').trim();
+              const email = String(formData.get('email') || '').trim();
+              const password = String(formData.get('password') || '');
+              const confirmPassword = String(formData.get('confirmPassword') || '');
 
               if (password !== confirmPassword) {
                 setSignUpError('Passwords do not match.');
@@ -400,7 +432,16 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
               }
 
               setSignUpError('');
-              onSignUp?.(role);
+              setSignUpLoading(true);
+              const phone = String(formData.get('phone') || '').trim();
+
+              try {
+                await onSignUp?.({ role, name, email, phone, password });
+              } catch (err) {
+                setSignUpError(err.message || 'Sign up failed. Please try again.');
+              } finally {
+                setSignUpLoading(false);
+              }
             }}
             style={{ display: 'grid', gap: '1rem' }}
           >
@@ -465,6 +506,7 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
 
             <button
               type="submit"
+              disabled={signUpLoading}
               style={{
                 padding: '0.85rem 1rem',
                 borderRadius: '0.85rem',
@@ -472,11 +514,12 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
                 background: 'linear-gradient(120deg, #16a34a, #0f766e)',
                 color: '#fff',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: signUpLoading ? 'not-allowed' : 'pointer',
                 fontSize: '1rem',
+                opacity: signUpLoading ? 0.8 : 1,
               }}
             >
-              Create {role === 'admin' ? 'Admin' : 'User'} account
+              {signUpLoading ? 'Creating account...' : `Create ${role === 'admin' ? 'Admin' : 'User'} account`}
             </button>
           </form>
 
@@ -490,6 +533,64 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
 }
 
 export default function App() {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+
+  async function authRequest(path, payload) {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body.message || 'Authentication failed');
+    }
+
+    return body;
+  }
+
+  async function apiRequest(path, options = {}) {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body.message || 'Request failed');
+    }
+
+    return body;
+  }
+
+  const handleGoogleContinue = () => {
+    const googleAuthUrl =
+      'https://accounts.google.com/signin/v2/identifier?service=mail&flowName=GlifWebSignIn&flowEntry=ServiceLogin';
+    window.open(googleAuthUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleWhatsAppContinue = () => {
+    const message = encodeURIComponent('Hello Agri-Clinic, I want to continue sign in with WhatsApp.');
+    window.open(`https://wa.me/?text=${message}`, '_blank', 'noopener,noreferrer');
+  };
+
+  function getStoredUser() {
+    try {
+      const raw = localStorage.getItem('authUser');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
   const [productsData, setProductsData] = useState(products);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -500,6 +601,15 @@ export default function App() {
   const [showSignUp, setShowSignUp] = useState(false);
   const [signInRole, setSignInRole] = useState('user');
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [showUserDashboard, setShowUserDashboard] = useState(false);
+  const [currentUser, setCurrentUser] = useState(getStoredUser);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [adminOrders, setAdminOrders] = useState([]);
+  const [adminOrderStats, setAdminOrderStats] = useState({ totalOrders: 0, totalBuyers: 0 });
+  const [adminOrdersLoading, setAdminOrdersLoading] = useState(false);
+  const [userOrders, setUserOrders] = useState([]);
+  const [userOrdersLoading, setUserOrdersLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [heroIndex, setHeroIndex] = useState(0);
   const [nextHeroIndex, setNextHeroIndex] = useState(1);
@@ -547,6 +657,7 @@ export default function App() {
   const productGridRef = useRef(null);
   const cartRef = useRef(null);
   const recommendedRef = useRef(null);
+  const profileMenuRef = useRef(null);
 
   useEffect(() => {
     let loaded = 0;
@@ -601,6 +712,92 @@ export default function App() {
       requestAnimationFrame(() => scrollToSection('signup'));
     }
   }, [showSignUp]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!profileMenuRef.current?.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    const fetchAdminOrders = async () => {
+      if (!showAdminDashboard || currentUser?.role !== 'admin') {
+        return;
+      }
+
+      setAdminOrdersLoading(true);
+      try {
+        const data = await apiRequest('/orders/admin', { method: 'GET' });
+        setAdminOrders(data.orders || []);
+        setAdminOrderStats({
+          totalOrders: data.totalOrders || 0,
+          totalBuyers: data.totalBuyers || 0,
+        });
+      } catch (err) {
+        window.alert(err.message || 'Failed to load admin orders');
+      } finally {
+        setAdminOrdersLoading(false);
+      }
+    };
+
+    fetchAdminOrders();
+  }, [showAdminDashboard, currentUser?.role]);
+
+  useEffect(() => {
+    const fetchUserOrders = async () => {
+      if (!showUserDashboard || currentUser?.role !== 'user') {
+        return;
+      }
+
+      setUserOrdersLoading(true);
+      try {
+        const data = await apiRequest('/orders/my', { method: 'GET' });
+        setUserOrders(data.orders || []);
+      } catch (err) {
+        window.alert(err.message || 'Failed to load your orders');
+      } finally {
+        setUserOrdersLoading(false);
+      }
+    };
+
+    fetchUserOrders();
+  }, [showUserDashboard, currentUser?.role]);
+
+  const handleOpenDashboard = () => {
+    setShowProfileMenu(false);
+    setShowSignIn(false);
+    setShowSignUp(false);
+    setShowDiseaseDetection(false);
+
+    if (currentUser?.role === 'admin') {
+      setShowUserDashboard(false);
+      setShowAdminDashboard(true);
+      return;
+    }
+
+    setShowAdminDashboard(false);
+    setShowUserDashboard(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authUser');
+    setCurrentUser(null);
+    setAdminOrders([]);
+    setAdminOrderStats({ totalOrders: 0, totalBuyers: 0 });
+    setUserOrders([]);
+    setShowProfileMenu(false);
+    setShowAdminDashboard(false);
+    setShowUserDashboard(false);
+    setShowSignIn(false);
+    setShowSignUp(false);
+    setActiveSection('home');
+  };
 
   const categories = useMemo(() => ['all', ...Array.from(new Set(productsData.map((p) => p.category)))], [productsData]);
   const categoryStats = useMemo(() => {
@@ -689,6 +886,44 @@ export default function App() {
   const cartItems = Object.entries(cart)
     .map(([id, qty]) => ({ ...productsData.find((p) => p.id === id), quantity: qty }))
     .filter(Boolean);
+
+  const handleCheckout = async () => {
+    if (!currentUser) {
+      window.alert('Please sign in to place an order.');
+      setShowSignIn(true);
+      setShowSignUp(false);
+      setShowDiseaseDetection(false);
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      return;
+    }
+
+    const payload = {
+      items: cartItems.map((item) => ({
+        productId: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: Number(item.price || 0),
+      })),
+    };
+
+    setCheckoutLoading(true);
+    try {
+      await apiRequest('/orders', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      window.alert('Order placed successfully.');
+      setCart({});
+      setShowCart(false);
+    } catch (err) {
+      window.alert(err.message || 'Failed to place order');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   const scrollToSection = (sectionId) => {
     setActiveSection(sectionId);
@@ -906,7 +1141,8 @@ export default function App() {
 
   const locationOptions = ['Pune', 'Nashik', 'Nagpur', 'Kolhapur', 'Sangli', 'Satara', 'Ahmednagar', 'Solapur', 'Amravati', 'Aurangabad'];
   const todayISO = new Date().toISOString().split('T')[0];
-  const showFullPage = !showSignIn && !showSignUp && !showAdminDashboard && !showDiseaseDetection;
+  const isAuthPage = showSignIn || showSignUp;
+  const showFullPage = !showSignIn && !showSignUp && !showAdminDashboard && !showUserDashboard && !showDiseaseDetection;
 
   const adminFilteredProducts = useMemo(() => {
     const needle = adminProductSearch.trim().toLowerCase();
@@ -1000,7 +1236,8 @@ export default function App() {
             🌾 Agri-Clinic
           </h1>
           
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {!isAuthPage && (
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <button onClick={() => scrollToSection('home')} style={{ background: 'none', border: 'none', color: activeSection === 'home' ? '#059669' : '#6b7280', fontWeight: activeSection === 'home' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Home</button>
             <button onClick={() => scrollToSection('about')} style={{ background: 'none', border: 'none', color: activeSection === 'about' ? '#059669' : '#6b7280', fontWeight: activeSection === 'about' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>About Us</button>
             <button onClick={() => scrollToSection('explore')} style={{ background: 'none', border: 'none', color: activeSection === 'explore' ? '#059669' : '#6b7280', fontWeight: activeSection === 'explore' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Explore</button>
@@ -1027,28 +1264,121 @@ export default function App() {
             >
               🔍 Disease Check
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowDiseaseDetection(false);
-                setShowAdminDashboard(false);
-                setShowSignUp(false);
-                setSignInRole('user');
-                setShowSignIn(true);
-              }}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '999px',
-                border: '1px solid #059669',
-                background: '#ecfdf5',
-                color: '#047857',
-                fontWeight: 700,
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-              }}
-            >
-              Account
-            </button>
+            {currentUser ? (
+              <div ref={profileMenuRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowProfileMenu((prev) => !prev)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.55rem',
+                    padding: '0.35rem 0.7rem 0.35rem 0.35rem',
+                    borderRadius: '999px',
+                    border: '1px solid #059669',
+                    background: '#ecfdf5',
+                    color: '#047857',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: '#059669',
+                      color: '#fff',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {String(currentUser?.name || currentUser?.email || 'U').trim().charAt(0).toUpperCase()}
+                  </span>
+                  <span>{currentUser?.name || 'User'}</span>
+                  <span style={{ fontSize: '0.75rem' }}>▾</span>
+                </button>
+
+                {showProfileMenu && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 0.5rem)',
+                      right: 0,
+                      minWidth: '170px',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      background: '#fff',
+                      boxShadow: '0 10px 25px rgba(15, 23, 42, 0.12)',
+                      padding: '0.4rem',
+                      zIndex: 120,
+                    }}
+                  >
+                    <div style={{ padding: '0.45rem 0.6rem', color: '#64748b', fontSize: '0.83rem' }}>{currentUser?.email}</div>
+                    <button
+                      type="button"
+                      onClick={handleOpenDashboard}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '0.5rem 0.6rem',
+                        border: 'none',
+                        borderRadius: '0.55rem',
+                        background: '#fff',
+                        color: '#0f172a',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Dashboard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '0.5rem 0.6rem',
+                        border: 'none',
+                        borderRadius: '0.55rem',
+                        background: '#fff',
+                        color: '#b91c1c',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDiseaseDetection(false);
+                  setShowAdminDashboard(false);
+                  setShowSignUp(false);
+                  setSignInRole('user');
+                  setShowSignIn(true);
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '999px',
+                  border: '1px solid #059669',
+                  background: '#ecfdf5',
+                  color: '#047857',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                }}
+              >
+                Account
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowCart(!showCart)}
@@ -1087,7 +1417,8 @@ export default function App() {
                 </span>
               )}
             </button>
-          </div>
+            </div>
+          )}
         </div>
       </nav>
 
@@ -1095,16 +1426,27 @@ export default function App() {
         <SignInSection
           role={signInRole}
           onRoleChange={setSignInRole}
+          onGoogleContinue={handleGoogleContinue}
+          onWhatsAppContinue={handleWhatsAppContinue}
           onCreateAccount={() => {
             setShowSignIn(false);
             setShowDiseaseDetection(false);
             setShowSignUp(true);
           }}
-          onSignIn={(role) => {
+          onSignIn={async ({ role, email, password }) => {
+            const data = await authRequest('/auth/login', { email, password, role });
+            localStorage.setItem('authToken', data.token);
+            localStorage.setItem('authUser', JSON.stringify(data.user));
+            setCurrentUser(data.user);
+            setShowProfileMenu(false);
+            window.alert('You are signed in.');
+
             setShowSignIn(false);
             setShowSignUp(false);
             setShowDiseaseDetection(false);
-            if (role === 'admin') {
+            setShowUserDashboard(false);
+
+            if (data.user?.role === 'admin') {
               setShowAdminDashboard(true);
             } else {
               setShowAdminDashboard(false);
@@ -1123,15 +1465,20 @@ export default function App() {
             setShowDiseaseDetection(false);
             setShowSignIn(true);
           }}
-          onSignUp={(role) => {
-            setShowSignUp(false);
-            setShowDiseaseDetection(false);
-            if (role === 'admin') {
-              setShowAdminDashboard(true);
-            } else {
-              setShowAdminDashboard(false);
-              setActiveSection('home');
+          onSignUp={async ({ role, name, email, phone, password }) => {
+            const data = await authRequest('/auth/signup', { name, email, phone, password, role });
+            if (!data?.user?.id) {
+              throw new Error('Signup failed. Please try again.');
             }
+
+            window.alert('Account created successfully. Please sign in.');
+            setShowSignUp(false);
+            setShowSignIn(true);
+            setShowDiseaseDetection(false);
+            setShowAdminDashboard(false);
+            setShowUserDashboard(false);
+            setShowProfileMenu(false);
+            setSignInRole(role || 'user');
           }}
         />
       )}
@@ -1176,10 +1523,10 @@ export default function App() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
               {[
-                { title: 'Pending Orders', value: '18', note: '4 need approval' },
+                { title: 'Total Orders', value: `${adminOrderStats.totalOrders}`, note: 'Orders from all users' },
+                { title: 'Total Buyers', value: `${adminOrderStats.totalBuyers}`, note: 'Unique customers' },
                 { title: 'Low Stock Items', value: '6', note: 'Reorder today' },
                 { title: 'Appointments Pending', value: `${pendingAppointments.length}`, note: 'New requests' },
-                { title: 'New Farmers', value: '41', note: 'This week' },
               ].map((item) => (
                 <div key={item.title} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.12)' }}>
                   <div style={{ fontSize: '0.9rem', color: '#bbf7d0', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.12em' }}>{item.title}</div>
@@ -1187,6 +1534,37 @@ export default function App() {
                   <div style={{ color: '#e2e8f0' }}>{item.note}</div>
                 </div>
               ))}
+            </div>
+
+            <div style={{ marginTop: '2rem', background: 'rgba(15,23,42,0.6)', borderRadius: '1rem', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Customer Orders</h3>
+                <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>Total: {adminOrderStats.totalOrders}</div>
+              </div>
+
+              {adminOrdersLoading ? (
+                <div style={{ color: '#94a3b8' }}>Loading orders...</div>
+              ) : adminOrders.length === 0 ? (
+                <div style={{ color: '#94a3b8' }}>No customer orders yet.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto', paddingRight: '0.4rem' }}>
+                  {adminOrders.map((order) => (
+                    <div key={order._id} style={{ display: 'grid', gap: '0.35rem', background: 'rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ fontWeight: 700 }}>{order.userSnapshot?.name || 'Customer'}</div>
+                        <span style={{ padding: '0.2rem 0.7rem', borderRadius: '999px', background: 'rgba(16,185,129,0.2)', color: '#bbf7d0', fontWeight: 700, fontSize: '0.75rem' }}>{order.status || 'placed'}</span>
+                      </div>
+                      <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>{order.userSnapshot?.email || 'No email'} · {order.userSnapshot?.phone || 'No phone'}</div>
+                      <div style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
+                        {order.items?.map((item) => `${item.name} x${item.quantity}`).join(', ')}
+                      </div>
+                      <div style={{ color: '#fde68a', fontSize: '0.9rem', fontWeight: 700 }}>
+                        INR {Number(order.totalAmount || 0).toFixed(2)} · {new Date(order.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ marginTop: '2rem', background: 'rgba(15,23,42,0.6)', borderRadius: '1rem', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.12)' }}>
@@ -1449,6 +1827,91 @@ export default function App() {
         </section>
       )}
 
+      {showUserDashboard && (
+        <section
+          style={{
+            padding: '4rem 2rem',
+            background: 'linear-gradient(120deg, #0f172a, #14532d)',
+            color: '#fff',
+            minHeight: '70vh',
+          }}
+        >
+          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+              <div>
+                <div style={{ fontSize: '0.9rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#86efac', marginBottom: '0.6rem' }}>
+                  My account
+                </div>
+                <h2 style={{ margin: 0, fontSize: '2.2rem', fontFamily: "'Playfair Display', 'Georgia', serif" }}>User Dashboard</h2>
+                <p style={{ margin: '0.6rem 0 0', color: '#cbd5f5' }}>View your profile and all your product purchases.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserDashboard(false);
+                  setActiveSection('home');
+                }}
+                style={{
+                  padding: '0.6rem 1.2rem',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  background: 'transparent',
+                  color: '#fff',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Return to site
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+                <div style={{ fontSize: '0.9rem', color: '#bbf7d0', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Name</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{currentUser?.name || 'User'}</div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+                <div style={{ fontSize: '0.9rem', color: '#bbf7d0', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Email</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{currentUser?.email || 'Not available'}</div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+                <div style={{ fontSize: '0.9rem', color: '#bbf7d0', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.12em' }}>My Orders</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{userOrders.length}</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '2rem', background: 'rgba(15,23,42,0.6)', borderRadius: '1rem', padding: '1.25rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Purchase History</h3>
+              </div>
+
+              {userOrdersLoading ? (
+                <div style={{ color: '#94a3b8' }}>Loading your orders...</div>
+              ) : userOrders.length === 0 ? (
+                <div style={{ color: '#94a3b8' }}>No purchases yet. Buy products to see order history.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: '0.6rem', maxHeight: '300px', overflowY: 'auto', paddingRight: '0.4rem' }}>
+                  {userOrders.map((order) => (
+                    <div key={order._id} style={{ display: 'grid', gap: '0.35rem', background: 'rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ fontWeight: 700 }}>Order #{String(order._id).slice(-6)}</div>
+                        <span style={{ padding: '0.2rem 0.7rem', borderRadius: '999px', background: 'rgba(16,185,129,0.2)', color: '#bbf7d0', fontWeight: 700, fontSize: '0.75rem' }}>{order.status || 'placed'}</span>
+                      </div>
+                      <div style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
+                        {order.items?.map((item) => `${item.name} x${item.quantity}`).join(', ')}
+                      </div>
+                      <div style={{ color: '#fde68a', fontSize: '0.9rem', fontWeight: 700 }}>
+                        INR {Number(order.totalAmount || 0).toFixed(2)} · {new Date(order.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {showDiseaseDetection && (
         <section
           style={{
@@ -1698,8 +2161,22 @@ export default function App() {
                   </div>
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '2px solid #d1fae5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#059669' }}>Total: INR {cartTotal.toFixed(2)}</div>
-                    <button type="button" style={{ padding: '0.6rem 1.5rem', borderRadius: '0.5rem', background: '#059669', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                      Proceed to Checkout
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      disabled={checkoutLoading}
+                      style={{
+                        padding: '0.6rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        background: '#059669',
+                        color: '#fff',
+                        border: 'none',
+                        cursor: checkoutLoading ? 'not-allowed' : 'pointer',
+                        fontWeight: 600,
+                        opacity: checkoutLoading ? 0.8 : 1,
+                      }}
+                    >
+                      {checkoutLoading ? 'Placing Order...' : 'Proceed to Checkout'}
                     </button>
                   </div>
                 </>
@@ -2321,17 +2798,17 @@ export default function App() {
                 <div style={{ padding: '1.5rem', background: '#f3f4f6', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>📱</p>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>Phone</h3>
-                  <p style={{ margin: 0, color: '#6b7280' }}>9876543210</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>6375409877</p>
                 </div>
                 <div style={{ padding: '1.5rem', background: '#f3f4f6', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>📧</p>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>Email</h3>
-                  <p style={{ margin: 0, color: '#6b7280' }}>info@agriclinic.com</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>agri@gmail.com</p>
                 </div>
                 <div style={{ padding: '1.5rem', background: '#f3f4f6', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>📍</p>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>Location</h3>
-                  <p style={{ margin: 0, color: '#6b7280' }}>Pune, Maharashtra</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>Namakkal</p>
                 </div>
               </div>
             </div>

@@ -1,13 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
+require('dotenv').config();
 const routes = require('./routes');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 const { port } = require('./config/appConfig');
-
-dotenv.config();
-
+const { connectDB } = require('./config/db');
 const app = express();
 
 app.use(cors());
@@ -18,6 +16,16 @@ app.use('/api', routes);
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(port, () => {
-  console.log(`API server running on port ${port}`);
-});
+async function start() {
+  try {
+    await connectDB(process.env.MONGO_URI);
+    app.listen(port, () => {
+      console.log(`API server running on port ${port}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
+  }
+}
+
+start();
