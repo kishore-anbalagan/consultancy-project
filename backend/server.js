@@ -18,7 +18,9 @@ app.use(errorHandler);
 
 async function start() {
   try {
-    await connectDB(process.env.MONGO_URI);
+    // Prefer Atlas URI when provided, otherwise fall back to local
+    const mongoUri = process.env.MONGO_URI_ATLAS || process.env.MONGO_URI;
+    await connectDB(mongoUri);
     app.listen(port, () => {
       console.log(`API server running on port ${port}`);
     });
