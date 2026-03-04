@@ -1,6 +1,8 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+// Load env from backend/.env even when app is started from repo root
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const routes = require('./routes');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
@@ -8,8 +10,46 @@ const { port } = require('./config/appConfig');
 const { connectDB } = require('./config/db');
 const app = express();
 
-app.use(cors());
+const defaultAllowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const configuredOrigins = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : defaultAllowedOrigins;
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
+
+app.get('/', (req, res) => {
+  res.json({
+    service: 'agriclinic-backend',
+    status: 'ok',
+    endpoints: {
+      health: '/api/health',
+      login: 'POST /api/auth/login',
+      signup: 'POST /api/auth/signup',
+    },
+  });
+});
 
 app.use('/api', routes);
 

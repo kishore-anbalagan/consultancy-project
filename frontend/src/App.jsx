@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import products from './data/products';
 
 const testimonials = [
@@ -533,7 +535,13 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
 }
 
 export default function App() {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+  const configuredApiOrigin = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').trim();
+  const normalizedApiOrigin = configuredApiOrigin ? configuredApiOrigin.replace(/\/+$/, '') : '';
+  const apiBaseUrl = normalizedApiOrigin ? `${normalizedApiOrigin}/api` : '/api';
+  const defaultChatGreeting = {
+    role: 'assistant',
+    content: 'Hi! I am your Agri Assistant. Ask me about crops, pests, fertilizer, irrigation, or soil health.',
+  };
 
   async function authRequest(path, payload) {
     const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -542,10 +550,16 @@ export default function App() {
       body: JSON.stringify(payload),
     });
 
-    const body = await response.json().catch(() => ({}));
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const body = isJson ? await response.json().catch(() => ({})) : {};
 
     if (!response.ok) {
       throw new Error(body.message || 'Authentication failed');
+    }
+
+    if (!body?.token || !body?.user?.id || !body?.user?.role) {
+      throw new Error('Authentication service is not connected. Check backend API URL and redeploy frontend.');
     }
 
     return body;
@@ -569,6 +583,30 @@ export default function App() {
     }
 
     return body;
+  }
+
+  async function askAgriAssistant(question) {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${apiBaseUrl}/chat/ask`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ question }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body.message || 'Assistant is unavailable right now');
+    }
+
+    return body;
+  }
+
+  async function getChatHistory() {
+    const data = await apiRequest('/chat/history', { method: 'GET' });
+    return data.messages || [];
   }
 
   const handleGoogleContinue = () => {
@@ -652,12 +690,19 @@ export default function App() {
   const [diseaseImage, setDiseaseImage] = useState(null);
   const [predictedDisease, setPredictedDisease] = useState(null);
   const [detectionLoading, setDetectionLoading] = useState(false);
+  const [showChatBot, setShowChatBot] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    defaultChatGreeting,
+  ]);
   const heroCycleRef = useRef(null);
   const heroSwitchRef = useRef(null);
   const productGridRef = useRef(null);
   const cartRef = useRef(null);
   const recommendedRef = useRef(null);
   const profileMenuRef = useRef(null);
+  const chatMessagesRef = useRef(null);
 
   useEffect(() => {
     let loaded = 0;
@@ -723,6 +768,50 @@ export default function App() {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    if (showChatBot) {
+      requestAnimationFrame(() => {
+        chatMessagesRef.current?.scrollTo({
+          top: chatMessagesRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      });
+    }
+  }, [chatMessages, showChatBot]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadChatHistory = async () => {
+      if (!currentUser?.id) {
+        setChatMessages([defaultChatGreeting]);
+        return;
+      }
+
+      try {
+        const history = await getChatHistory();
+        const historyMessages = history.flatMap((entry) => [
+          { role: 'user', content: entry.question },
+          { role: 'assistant', content: entry.answer },
+        ]);
+
+        if (!cancelled) {
+          setChatMessages([defaultChatGreeting, ...historyMessages]);
+        }
+      } catch {
+        if (!cancelled) {
+          setChatMessages([defaultChatGreeting]);
+        }
+      }
+    };
+
+    loadChatHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const fetchAdminOrders = async () => {
@@ -1137,6 +1226,40 @@ export default function App() {
       usageInstructions: '',
       precautions: '',
     });
+  };
+
+  const handleChatSubmit = async (event) => {
+    event.preventDefault();
+    const question = chatInput.trim();
+    if (!question || chatLoading) {
+      return;
+    }
+
+    setChatMessages((prev) => [...prev, { role: 'user', content: question }]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const data = await askAgriAssistant(question);
+      const answer = String(data.answer || '').trim();
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: answer || 'I could not generate a response. Please try again.',
+        },
+      ]);
+    } catch (err) {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: err.message || 'Assistant is temporarily unavailable. Please try again shortly.',
+        },
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const locationOptions = ['Pune', 'Nashik', 'Nagpur', 'Kolhapur', 'Sangli', 'Satara', 'Ahmednagar', 'Solapur', 'Amravati', 'Aurangabad'];
@@ -2845,6 +2968,137 @@ export default function App() {
               </div>
             </div>
           </footer>
+
+          <div style={{ position: 'fixed', right: '1.2rem', bottom: '1.2rem', zIndex: 110 }}>
+            {showChatBot && (
+              <div
+                style={{
+                  width: '340px',
+                  maxWidth: 'calc(100vw - 2.4rem)',
+                  background: '#ffffff',
+                  border: '1px solid #d1fae5',
+                  borderRadius: '1rem',
+                  overflow: 'hidden',
+                  boxShadow: '0 14px 30px rgba(15, 23, 42, 0.22)',
+                  marginBottom: '0.8rem',
+                }}
+              >
+                <div style={{ background: 'linear-gradient(120deg, #059669, #0f766e)', color: '#fff', padding: '0.9rem 1rem', fontWeight: 700 }}>
+                  Agri Assistant
+                </div>
+
+                <div ref={chatMessagesRef} style={{ maxHeight: '280px', overflowY: 'auto', padding: '0.9rem', background: '#ecfdf5', display: 'grid', gap: '0.65rem' }}>
+                  {chatMessages.map((message, index) => (
+                    <div
+                      key={`${message.role}-${index}`}
+                      style={{
+                        justifySelf: message.role === 'user' ? 'end' : 'start',
+                        maxWidth: '88%',
+                        background: message.role === 'user' ? '#059669' : '#fff',
+                        color: message.role === 'user' ? '#fff' : '#1f2937',
+                        border: message.role === 'user' ? 'none' : '1px solid #d1d5db',
+                        borderRadius: '0.8rem',
+                        padding: '0.65rem 0.75rem',
+                        whiteSpace: 'pre-wrap',
+                        lineHeight: 1.45,
+                        fontSize: '0.92rem',
+                      }}
+                    >
+                      {message.role === 'assistant' ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ node, ...props }) => <p style={{ margin: 0 }} {...props} />,
+                            ul: ({ node, ...props }) => <ul style={{ margin: '0.4rem 0 0.2rem', paddingLeft: '1.1rem' }} {...props} />,
+                            ol: ({ node, ...props }) => <ol style={{ margin: '0.4rem 0 0.2rem', paddingLeft: '1.1rem' }} {...props} />,
+                            li: ({ node, ...props }) => <li style={{ marginBottom: '0.2rem' }} {...props} />,
+                            strong: ({ node, ...props }) => <strong style={{ fontWeight: 700 }} {...props} />,
+                            code: ({ node, inline, className, children, ...props }) => (
+                              inline ? (
+                                <code style={{ background: '#dcfce7', borderRadius: '0.3rem', padding: '0.05rem 0.3rem' }} {...props}>
+                                  {children}
+                                </code>
+                              ) : (
+                                <code
+                                  className={className}
+                                  style={{ display: 'block', whiteSpace: 'pre-wrap', background: '#dcfce7', borderRadius: '0.4rem', padding: '0.45rem 0.6rem' }}
+                                  {...props}
+                                >
+                                  {children}
+                                </code>
+                              )
+                            ),
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      ) : (
+                        message.content
+                      )}
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ justifySelf: 'start', background: '#fff', border: '1px solid #d1d5db', borderRadius: '0.8rem', padding: '0.6rem 0.75rem', color: '#6b7280', fontSize: '0.9rem' }}>
+                      Thinking...
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
+                  <input
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    placeholder="Ask about crops, pests, fertilizer..."
+                    maxLength={800}
+                    style={{
+                      flex: 1,
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '0.6rem',
+                      padding: '0.55rem 0.65rem',
+                      fontSize: '0.92rem',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading || !chatInput.trim()}
+                    style={{
+                      border: 'none',
+                      borderRadius: '0.6rem',
+                      padding: '0.55rem 0.85rem',
+                      background: '#059669',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: chatLoading || !chatInput.trim() ? 'not-allowed' : 'pointer',
+                      opacity: chatLoading || !chatInput.trim() ? 0.75 : 1,
+                    }}
+                  >
+                    Send
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowChatBot((prev) => !prev)}
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '999px',
+                border: 'none',
+                background: 'linear-gradient(120deg, #059669, #0f766e)',
+                color: '#fff',
+                fontSize: '1.35rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 10px 24px rgba(5, 150, 105, 0.45)',
+              }}
+              aria-label={showChatBot ? 'Close chat assistant' : 'Open chat assistant'}
+              title={showChatBot ? 'Close chat' : 'Chat with Agri Assistant'}
+            >
+              {showChatBot ? '×' : '💬'}
+            </button>
+          </div>
         </>
       )}
     </div>

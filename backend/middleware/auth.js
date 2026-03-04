@@ -29,4 +29,27 @@ function requireAdmin(req, res, next) {
   return next();
 }
 
-module.exports = { requireAuth, requireAdmin };
+function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token) {
+    return next();
+  }
+
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return next();
+  }
+
+  try {
+    const payload = jwt.verify(token, secret);
+    req.user = { id: payload.sub, role: payload.role };
+  } catch (err) {
+    req.user = null;
+  }
+
+  return next();
+}
+
+module.exports = { requireAuth, requireAdmin, optionalAuth };
