@@ -47,6 +47,7 @@ app.get('/', (req, res) => {
       health: '/api/health',
       login: 'POST /api/auth/login',
       signup: 'POST /api/auth/signup',
+      appointments: 'POST /api/appointments',
     },
   });
 });
