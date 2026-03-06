@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import products from './data/products';
 
 const testimonials = [
@@ -538,10 +536,6 @@ export default function App() {
   const configuredApiOrigin = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').trim();
   const normalizedApiOrigin = configuredApiOrigin ? configuredApiOrigin.replace(/\/+$/, '') : '';
   const apiBaseUrl = normalizedApiOrigin ? `${normalizedApiOrigin}/api` : '/api';
-  const defaultChatGreeting = {
-    role: 'assistant',
-    content: 'Hi! I am your Agri Assistant. Ask me about crops, pests, fertilizer, irrigation, or soil health.',
-  };
 
   async function authRequest(path, payload) {
     const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -583,30 +577,6 @@ export default function App() {
     }
 
     return body;
-  }
-
-  async function askAgriAssistant(question) {
-    const token = localStorage.getItem('authToken');
-    const response = await fetch(`${apiBaseUrl}/chat/ask`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ question }),
-    });
-
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(body.message || 'Assistant is unavailable right now');
-    }
-
-    return body;
-  }
-
-  async function getChatHistory() {
-    const data = await apiRequest('/chat/history', { method: 'GET' });
-    return data.messages || [];
   }
 
   const handleGoogleContinue = () => {
@@ -672,9 +642,9 @@ export default function App() {
   const [adminProductSearch, setAdminProductSearch] = useState('');
   const [adminProductCategory, setAdminProductCategory] = useState('all');
   const [appointmentForm, setAppointmentForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
+    name: currentUser?.name || '',
+    phone: currentUser?.phone || '',
+    email: currentUser?.email || '',
     date: '',
     time: '',
     service: 'Soil & Crop Advisory',
@@ -686,23 +656,17 @@ export default function App() {
   const serviceOptions = ['Soil & Crop Advisory', 'Pest & Disease Support', 'Fertilizer Planning', 'General Consultation'];
   const [appointmentSubmitted, setAppointmentSubmitted] = useState(false);
   const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentSubmitting, setAppointmentSubmitting] = useState(false);
   const [showDiseaseDetection, setShowDiseaseDetection] = useState(false);
   const [diseaseImage, setDiseaseImage] = useState(null);
   const [predictedDisease, setPredictedDisease] = useState(null);
   const [detectionLoading, setDetectionLoading] = useState(false);
-  const [showChatBot, setShowChatBot] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    defaultChatGreeting,
-  ]);
   const heroCycleRef = useRef(null);
   const heroSwitchRef = useRef(null);
   const productGridRef = useRef(null);
-  const cartRef = useRef(null);
   const recommendedRef = useRef(null);
   const profileMenuRef = useRef(null);
-  const chatMessagesRef = useRef(null);
 
   useEffect(() => {
     let loaded = 0;
@@ -741,12 +705,6 @@ export default function App() {
   }, [heroIndex, heroReady]);
 
   useEffect(() => {
-    if (showCart) {
-      cartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [showCart]);
-
-  useEffect(() => {
     if (showSignIn) {
       requestAnimationFrame(() => scrollToSection('signin'));
     }
@@ -759,6 +717,15 @@ export default function App() {
   }, [showSignUp]);
 
   useEffect(() => {
+    setAppointmentForm((prev) => ({
+      ...prev,
+      name: currentUser?.name || '',
+      email: currentUser?.email || '',
+      phone: currentUser?.phone || prev.phone || '',
+    }));
+  }, [currentUser]);
+
+  useEffect(() => {
     const handleOutsideClick = (event) => {
       if (!profileMenuRef.current?.contains(event.target)) {
         setShowProfileMenu(false);
@@ -768,50 +735,6 @@ export default function App() {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
-
-  useEffect(() => {
-    if (showChatBot) {
-      requestAnimationFrame(() => {
-        chatMessagesRef.current?.scrollTo({
-          top: chatMessagesRef.current.scrollHeight,
-          behavior: 'smooth',
-        });
-      });
-    }
-  }, [chatMessages, showChatBot]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadChatHistory = async () => {
-      if (!currentUser?.id) {
-        setChatMessages([defaultChatGreeting]);
-        return;
-      }
-
-      try {
-        const history = await getChatHistory();
-        const historyMessages = history.flatMap((entry) => [
-          { role: 'user', content: entry.question },
-          { role: 'assistant', content: entry.answer },
-        ]);
-
-        if (!cancelled) {
-          setChatMessages([defaultChatGreeting, ...historyMessages]);
-        }
-      } catch {
-        if (!cancelled) {
-          setChatMessages([defaultChatGreeting]);
-        }
-      }
-    };
-
-    loadChatHistory();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUser?.id]);
 
   useEffect(() => {
     const fetchAdminOrders = async () => {
@@ -835,6 +758,26 @@ export default function App() {
     };
 
     fetchAdminOrders();
+  }, [showAdminDashboard, currentUser?.role]);
+
+  useEffect(() => {
+    const fetchAdminAppointments = async () => {
+      if (!showAdminDashboard || currentUser?.role !== 'admin') {
+        return;
+      }
+
+      setAppointmentsLoading(true);
+      try {
+        const data = await apiRequest('/appointments/admin', { method: 'GET' });
+        setAppointments(data.appointments || []);
+      } catch (err) {
+        window.alert(err.message || 'Failed to load appointments');
+      } finally {
+        setAppointmentsLoading(false);
+      }
+    };
+
+    fetchAdminAppointments();
   }, [showAdminDashboard, currentUser?.role]);
 
   useEffect(() => {
@@ -1104,30 +1047,43 @@ export default function App() {
     }));
   };
 
-  const handleAppointmentSubmit = (event) => {
+  const handleAppointmentSubmit = async (event) => {
     event.preventDefault();
-    setAppointments((prev) => [
-      {
-        id: `appt-${Date.now()}`,
-        ...appointmentForm,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setAppointmentSubmitted(true);
-    setAppointmentForm({
-      name: '',
-      phone: '',
-      email: '',
-      date: '',
-      time: '',
-      service: 'Soil & Crop Advisory',
-      contactMethod: 'Phone',
-      farmSize: '1-5 acres',
-      location: '',
-      message: '',
-    });
+
+    if (!currentUser) {
+      window.alert('Please sign in to book an appointment.');
+      setShowSignIn(true);
+      setShowSignUp(false);
+      setShowDiseaseDetection(false);
+      return;
+    }
+
+    setAppointmentSubmitting(true);
+    try {
+      const data = await apiRequest('/appointments', {
+        method: 'POST',
+        body: JSON.stringify(appointmentForm),
+      });
+
+      setAppointments((prev) => [data.appointment, ...prev]);
+      setAppointmentSubmitted(true);
+      setAppointmentForm({
+        name: currentUser?.name || '',
+        phone: currentUser?.phone || '',
+        email: currentUser?.email || '',
+        date: '',
+        time: '',
+        service: 'Soil & Crop Advisory',
+        contactMethod: 'Phone',
+        farmSize: '1-5 acres',
+        location: '',
+        message: '',
+      });
+    } catch (err) {
+      window.alert(err.message || 'Failed to submit appointment');
+    } finally {
+      setAppointmentSubmitting(false);
+    }
   };
 
   const pendingAppointments = useMemo(
@@ -1226,40 +1182,6 @@ export default function App() {
       usageInstructions: '',
       precautions: '',
     });
-  };
-
-  const handleChatSubmit = async (event) => {
-    event.preventDefault();
-    const question = chatInput.trim();
-    if (!question || chatLoading) {
-      return;
-    }
-
-    setChatMessages((prev) => [...prev, { role: 'user', content: question }]);
-    setChatInput('');
-    setChatLoading(true);
-
-    try {
-      const data = await askAgriAssistant(question);
-      const answer = String(data.answer || '').trim();
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: answer || 'I could not generate a response. Please try again.',
-        },
-      ]);
-    } catch (err) {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: err.message || 'Assistant is temporarily unavailable. Please try again shortly.',
-        },
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
   };
 
   const locationOptions = ['Pune', 'Nashik', 'Nagpur', 'Kolhapur', 'Sangli', 'Satara', 'Ahmednagar', 'Solapur', 'Amravati', 'Aurangabad'];
@@ -1695,12 +1617,14 @@ export default function App() {
                 <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Appointments Received</h3>
                 <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>Pending: {pendingAppointments.length}</div>
               </div>
-              {appointments.length === 0 ? (
+              {appointmentsLoading ? (
+                <div style={{ color: '#94a3b8' }}>Loading appointments...</div>
+              ) : appointments.length === 0 ? (
                 <div style={{ color: '#94a3b8' }}>No appointment requests yet.</div>
               ) : (
                 <div style={{ display: 'grid', gap: '0.6rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '0.4rem' }}>
                   {appointments.map((item) => (
-                    <div key={item.id} style={{ display: 'grid', gap: '0.35rem', background: 'rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+                    <div key={item._id || item.id} style={{ display: 'grid', gap: '0.35rem', background: 'rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.12)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                         <div style={{ fontWeight: 700 }}>{item.name || 'Farmer'}</div>
                         <span style={{ padding: '0.2rem 0.7rem', borderRadius: '999px', background: 'rgba(250,204,21,0.2)', color: '#fde68a', fontWeight: 700, fontSize: '0.75rem' }}>{item.status}</span>
@@ -2254,56 +2178,115 @@ export default function App() {
 
       {showFullPage && (
         <>
-          {/* Cart Modal */}
+          {/* Cart Drawer */}
           {showCart && (
-            <div ref={cartRef} style={{ padding: '1rem 2rem', marginBottom: '2rem', maxWidth: '1200px', margin: '0 auto 2rem', border: '2px solid #059669', borderRadius: '0.75rem', background: '#ecfdf5' }}>
-              <h2 style={{ margin: '0 0 1rem 0', color: '#059669' }}>Shopping Cart ({cartCount} items)</h2>
-              {cartItems.length === 0 ? (
-                <p style={{ color: '#059669', margin: 0 }}>Your cart is empty. Start shopping!</p>
-              ) : (
-                <>
-                  <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1rem' }}>
-                    {cartItems.map((item) => (
-                      <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: '#fff', borderRadius: '0.5rem', border: '1px solid #d1fae5' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, color: '#1f2937' }}>{item.name}</div>
-                          <div style={{ fontSize: '0.9rem', color: '#6b7280' }}>INR {item.price} each</div>
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.45)',
+                zIndex: 130,
+              }}
+            >
+              <button
+                type="button"
+                aria-label="Close cart overlay"
+                onClick={() => setShowCart(false)}
+                style={{ position: 'absolute', inset: 0, border: 'none', background: 'transparent', cursor: 'default' }}
+              />
+              <aside
+                role="dialog"
+                aria-modal="true"
+                aria-label="Shopping Cart"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  height: '100%',
+                  width: 'min(420px, 92vw)',
+                  background: 'linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%)',
+                  borderLeft: '1px solid #a7f3d0',
+                  boxShadow: '-12px 0 35px rgba(15, 23, 42, 0.25)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <div style={{ padding: '1rem 1rem 0.75rem', borderBottom: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ margin: 0, color: '#047857', fontSize: '1.2rem' }}>Shopping Cart ({cartCount})</h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowCart(false)}
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '999px',
+                      border: '1px solid #86efac',
+                      background: '#fff',
+                      color: '#047857',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                    }}
+                  >
+                    X
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+                  {cartItems.length === 0 ? (
+                    <p style={{ color: '#059669', margin: 0 }}>Your cart is empty. Start shopping!</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                      {cartItems.map((item) => (
+                        <div key={item.id} style={{ padding: '0.75rem', background: '#fff', borderRadius: '0.6rem', border: '1px solid #d1fae5' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <div style={{ fontWeight: 600, color: '#1f2937', lineHeight: 1.3 }}>{item.name}</div>
+                            <div style={{ fontWeight: 700, color: '#059669', whiteSpace: 'nowrap' }}>INR {(item.price * item.quantity).toFixed(2)}</div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ fontSize: '0.88rem', color: '#6b7280' }}>INR {item.price} each</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <button type="button" onClick={() => updateCartQty(item.id, item.quantity - 1)} style={{ width: '28px', height: '28px', borderRadius: '0.35rem', border: '1px solid #059669', background: '#fff', color: '#059669', cursor: 'pointer', fontWeight: 700 }}>
+                                -
+                              </button>
+                              <span style={{ width: '24px', textAlign: 'center', fontWeight: 600 }}>{item.quantity}</span>
+                              <button type="button" onClick={() => updateCartQty(item.id, item.quantity + 1)} style={{ width: '28px', height: '28px', borderRadius: '0.35rem', border: '1px solid #059669', background: '#fff', color: '#059669', cursor: 'pointer', fontWeight: 700 }}>
+                                +
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <button type="button" onClick={() => updateCartQty(item.id, item.quantity - 1)} style={{ padding: '0.3rem 0.6rem', borderRadius: '0.3rem', border: '1px solid #059669', background: '#fff', color: '#059669', cursor: 'pointer', fontWeight: 600 }}>
-                            −
-                          </button>
-                          <span style={{ width: '30px', textAlign: 'center', fontWeight: 600 }}>{item.quantity}</span>
-                          <button type="button" onClick={() => updateCartQty(item.id, item.quantity + 1)} style={{ padding: '0.3rem 0.6rem', borderRadius: '0.3rem', border: '1px solid #059669', background: '#fff', color: '#059669', cursor: 'pointer', fontWeight: 600 }}>
-                            +
-                          </button>
-                        </div>
-                        <div style={{ width: '100px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>INR {(item.price * item.quantity).toFixed(2)}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '2px solid #d1fae5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#059669' }}>Total: INR {cartTotal.toFixed(2)}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {cartItems.length > 0 && (
+                  <div style={{ padding: '0.95rem 1rem 1.1rem', borderTop: '1px solid #bbf7d0', background: '#ecfdf5' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#047857' }}>Total</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#047857' }}>INR {cartTotal.toFixed(2)}</div>
+                    </div>
                     <button
                       type="button"
                       onClick={handleCheckout}
                       disabled={checkoutLoading}
                       style={{
-                        padding: '0.6rem 1.5rem',
-                        borderRadius: '0.5rem',
+                        width: '100%',
+                        padding: '0.7rem 1rem',
+                        borderRadius: '0.55rem',
                         background: '#059669',
                         color: '#fff',
                         border: 'none',
                         cursor: checkoutLoading ? 'not-allowed' : 'pointer',
-                        fontWeight: 600,
+                        fontWeight: 700,
                         opacity: checkoutLoading ? 0.8 : 1,
                       }}
                     >
                       {checkoutLoading ? 'Placing Order...' : 'Proceed to Checkout'}
                     </button>
                   </div>
-                </>
-              )}
+                )}
+              </aside>
             </div>
           )}
 
@@ -2706,6 +2689,11 @@ export default function App() {
                   Thanks! Your appointment request has been sent.
                 </div>
               )}
+              {!currentUser && (
+                <div style={{ background: '#fff7ed', border: '1px solid #fdba74', color: '#9a3412', padding: '0.75rem 1rem', borderRadius: '0.5rem', marginBottom: '1.5rem', textAlign: 'center', fontWeight: 600 }}>
+                  Please sign in before booking an appointment.
+                </div>
+              )}
               <form onSubmit={handleAppointmentSubmit} style={{ background: '#fff', padding: '2rem', borderRadius: '1rem', boxShadow: '0 10px 25px rgba(0,0,0,0.08)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '1.5rem' }}>
                   <div>
@@ -2847,8 +2835,8 @@ export default function App() {
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', marginBottom: '1.5rem' }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                      <button type="submit" style={{ padding: '0.8rem 2rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '0.6rem', fontWeight: 700, cursor: 'pointer' }}>
-                        Book Appointment
+                      <button type="submit" disabled={appointmentSubmitting || !currentUser} style={{ padding: '0.8rem 2rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '0.6rem', fontWeight: 700, cursor: appointmentSubmitting || !currentUser ? 'not-allowed' : 'pointer', opacity: appointmentSubmitting || !currentUser ? 0.85 : 1 }}>
+                        {appointmentSubmitting ? 'Submitting...' : 'Book Appointment'}
                       </button>
                     </div>
                   </div>
@@ -2968,137 +2956,6 @@ export default function App() {
               </div>
             </div>
           </footer>
-
-          <div style={{ position: 'fixed', right: '1.2rem', bottom: '1.2rem', zIndex: 110 }}>
-            {showChatBot && (
-              <div
-                style={{
-                  width: '340px',
-                  maxWidth: 'calc(100vw - 2.4rem)',
-                  background: '#ffffff',
-                  border: '1px solid #d1fae5',
-                  borderRadius: '1rem',
-                  overflow: 'hidden',
-                  boxShadow: '0 14px 30px rgba(15, 23, 42, 0.22)',
-                  marginBottom: '0.8rem',
-                }}
-              >
-                <div style={{ background: 'linear-gradient(120deg, #059669, #0f766e)', color: '#fff', padding: '0.9rem 1rem', fontWeight: 700 }}>
-                  Agri Assistant
-                </div>
-
-                <div ref={chatMessagesRef} style={{ maxHeight: '280px', overflowY: 'auto', padding: '0.9rem', background: '#ecfdf5', display: 'grid', gap: '0.65rem' }}>
-                  {chatMessages.map((message, index) => (
-                    <div
-                      key={`${message.role}-${index}`}
-                      style={{
-                        justifySelf: message.role === 'user' ? 'end' : 'start',
-                        maxWidth: '88%',
-                        background: message.role === 'user' ? '#059669' : '#fff',
-                        color: message.role === 'user' ? '#fff' : '#1f2937',
-                        border: message.role === 'user' ? 'none' : '1px solid #d1d5db',
-                        borderRadius: '0.8rem',
-                        padding: '0.65rem 0.75rem',
-                        whiteSpace: 'pre-wrap',
-                        lineHeight: 1.45,
-                        fontSize: '0.92rem',
-                      }}
-                    >
-                      {message.role === 'assistant' ? (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            p: ({ node, ...props }) => <p style={{ margin: 0 }} {...props} />,
-                            ul: ({ node, ...props }) => <ul style={{ margin: '0.4rem 0 0.2rem', paddingLeft: '1.1rem' }} {...props} />,
-                            ol: ({ node, ...props }) => <ol style={{ margin: '0.4rem 0 0.2rem', paddingLeft: '1.1rem' }} {...props} />,
-                            li: ({ node, ...props }) => <li style={{ marginBottom: '0.2rem' }} {...props} />,
-                            strong: ({ node, ...props }) => <strong style={{ fontWeight: 700 }} {...props} />,
-                            code: ({ node, inline, className, children, ...props }) => (
-                              inline ? (
-                                <code style={{ background: '#dcfce7', borderRadius: '0.3rem', padding: '0.05rem 0.3rem' }} {...props}>
-                                  {children}
-                                </code>
-                              ) : (
-                                <code
-                                  className={className}
-                                  style={{ display: 'block', whiteSpace: 'pre-wrap', background: '#dcfce7', borderRadius: '0.4rem', padding: '0.45rem 0.6rem' }}
-                                  {...props}
-                                >
-                                  {children}
-                                </code>
-                              )
-                            ),
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                      ) : (
-                        message.content
-                      )}
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div style={{ justifySelf: 'start', background: '#fff', border: '1px solid #d1d5db', borderRadius: '0.8rem', padding: '0.6rem 0.75rem', color: '#6b7280', fontSize: '0.9rem' }}>
-                      Thinking...
-                    </div>
-                  )}
-                </div>
-
-                <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
-                  <input
-                    value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
-                    placeholder="Ask about crops, pests, fertilizer..."
-                    maxLength={800}
-                    style={{
-                      flex: 1,
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '0.6rem',
-                      padding: '0.55rem 0.65rem',
-                      fontSize: '0.92rem',
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={chatLoading || !chatInput.trim()}
-                    style={{
-                      border: 'none',
-                      borderRadius: '0.6rem',
-                      padding: '0.55rem 0.85rem',
-                      background: '#059669',
-                      color: '#fff',
-                      fontWeight: 700,
-                      cursor: chatLoading || !chatInput.trim() ? 'not-allowed' : 'pointer',
-                      opacity: chatLoading || !chatInput.trim() ? 0.75 : 1,
-                    }}
-                  >
-                    Send
-                  </button>
-                </form>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowChatBot((prev) => !prev)}
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '999px',
-                border: 'none',
-                background: 'linear-gradient(120deg, #059669, #0f766e)',
-                color: '#fff',
-                fontSize: '1.35rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 10px 24px rgba(5, 150, 105, 0.45)',
-              }}
-              aria-label={showChatBot ? 'Close chat assistant' : 'Open chat assistant'}
-              title={showChatBot ? 'Close chat' : 'Chat with Agri Assistant'}
-            >
-              {showChatBot ? '×' : '💬'}
-            </button>
-          </div>
         </>
       )}
     </div>
