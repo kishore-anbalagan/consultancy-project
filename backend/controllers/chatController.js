@@ -1,5 +1,10 @@
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const ChatMessage = require('../models/ChatMessage');
+const GUEST_PROMPT_LIMIT = Number(process.env.GUEST_CHAT_PROMPT_LIMIT || 3);
+
+function getGuestSessionId(req) {
+  return String(req.headers['x-guest-session-id'] || '').trim().slice(0, 120);
+}
 
 async function generateCompletion({ apiKey, model, messages, maxTokens }) {
   const response = await fetch(GROQ_API_URL, {
@@ -36,6 +41,23 @@ async function askQuestion(req, res, next) {
 
     if (question.length > 800) {
       return res.status(400).json({ message: 'Question is too long. Please keep it under 800 characters.' });
+    }
+
+    const guestSessionId = getGuestSessionId(req);
+    if (!req.user?.id && !guestSessionId) {
+      return res.status(400).json({ message: 'Missing guest session id', code: 'MISSING_GUEST_SESSION' });
+    }
+
+    if (!req.user?.id) {
+      const guestPromptCount = await ChatMessage.countDocuments({ guestSessionId });
+      if (guestPromptCount >= GUEST_PROMPT_LIMIT) {
+        return res.status(403).json({
+          message: `Guest chat limit reached. Please sign in to continue after ${GUEST_PROMPT_LIMIT} prompts.`,
+          code: 'GUEST_PROMPT_LIMIT_EXCEEDED',
+          promptLimit: GUEST_PROMPT_LIMIT,
+          guestPromptsRemaining: 0,
+        });
+      }
     }
 
     const apiKey = process.env.GROQ_API_KEY;
@@ -85,18 +107,25 @@ async function askQuestion(req, res, next) {
       return res.status(502).json({ message: 'AI provider returned an empty response' });
     }
 
-    if (req.user?.id) {
-      await ChatMessage.create({
-        user: req.user.id,
-        question,
-        answer,
-        model: payload?.model || model,
-      });
+    await ChatMessage.create({
+      user: req.user?.id || undefined,
+      guestSessionId: req.user?.id ? '' : guestSessionId,
+      question,
+      answer,
+      model: payload?.model || model,
+    });
+
+    let guestPromptsRemaining;
+    if (!req.user?.id) {
+      const guestPromptCount = await ChatMessage.countDocuments({ guestSessionId });
+      guestPromptsRemaining = Math.max(0, GUEST_PROMPT_LIMIT - guestPromptCount);
     }
 
     return res.json({
       answer,
       model: payload?.model || model,
+      guestPromptsRemaining,
+      promptLimit: req.user?.id ? undefined : GUEST_PROMPT_LIMIT,
     });
   } catch (err) {
     if (err?.status) {
@@ -108,11 +137,13 @@ async function askQuestion(req, res, next) {
 
 async function getHistory(req, res, next) {
   try {
-    if (!req.user?.id) {
-      return res.status(401).json({ message: 'Unauthorized' });
+    const guestSessionId = getGuestSessionId(req);
+    if (!req.user?.id && !guestSessionId) {
+      return res.status(400).json({ message: 'Missing guest session id', code: 'MISSING_GUEST_SESSION' });
     }
 
-    const records = await ChatMessage.find({ user: req.user.id })
+    const filter = req.user?.id ? { user: req.user.id } : { guestSessionId };
+    const records = await ChatMessage.find(filter)
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
@@ -126,7 +157,17 @@ async function getHistory(req, res, next) {
         createdAt: record.createdAt,
       }));
 
-    return res.json({ messages });
+    let guestPromptsRemaining;
+    if (!req.user?.id) {
+      const totalGuestPrompts = await ChatMessage.countDocuments({ guestSessionId });
+      guestPromptsRemaining = Math.max(0, GUEST_PROMPT_LIMIT - totalGuestPrompts);
+    }
+
+    return res.json({
+      messages,
+      guestPromptsRemaining,
+      promptLimit: req.user?.id ? undefined : GUEST_PROMPT_LIMIT,
+    });
   } catch (err) {
     return next(err);
   }

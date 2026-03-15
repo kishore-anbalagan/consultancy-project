@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const { roles } = require('../models/User');
 
@@ -90,4 +91,70 @@ async function login(req, res, next) {
   }
 }
 
-module.exports = { signup, login };
+async function verifyGoogleIdToken(idToken) {
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const err = new Error(payload?.error_description || payload?.error || 'Invalid Google token');
+    err.status = 401;
+    throw err;
+  }
+
+  return payload;
+}
+
+async function googleLogin(req, res, next) {
+  try {
+    const credential = String(req.body?.credential || '').trim();
+    if (!credential) {
+      return res.status(400).json({ message: 'Google credential is required' });
+    }
+
+    const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+    const hasGoogleClientId = googleClientId && !googleClientId.includes('your-google-web-client-id.apps.googleusercontent.com');
+    if (!hasGoogleClientId) {
+      return res.status(503).json({ message: 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID in backend/.env.' });
+    }
+
+    const googleUser = await verifyGoogleIdToken(credential);
+    if (googleUser.aud !== googleClientId) {
+      return res.status(401).json({ message: 'Google token audience mismatch' });
+    }
+
+    if (!googleUser.email || googleUser.email_verified !== 'true') {
+      return res.status(401).json({ message: 'Google account email is not verified' });
+    }
+
+    const email = String(googleUser.email).toLowerCase();
+    let user = await User.findOne({ email });
+
+    if (user && user.role === 'admin') {
+      return res.status(403).json({ message: 'Admin cannot sign in with Google' });
+    }
+
+    if (!user) {
+      const fallbackName = email.split('@')[0] || 'Farmer';
+      user = await User.create({
+        name: googleUser.name || fallbackName,
+        email,
+        phone: '',
+        password: crypto.randomBytes(24).toString('hex'),
+        role: 'user',
+      });
+    }
+
+    const token = signToken(user);
+    return res.json({
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone || '', role: user.role },
+      token,
+    });
+  } catch (err) {
+    if (err?.status) {
+      return res.status(err.status).json({ message: err.message || 'Google sign-in failed' });
+    }
+    return next(err);
+  }
+}
+
+module.exports = { signup, login, googleLogin };
