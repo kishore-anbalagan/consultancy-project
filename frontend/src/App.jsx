@@ -31,9 +31,26 @@ const heroImages = [
   'https://img.freepik.com/premium-photo/village-old-farmer-is-working-green-planting-paddy-seeds-weed-out-grass_709167-309.jpg',
 ];
 
-function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange, onGoogleContinue, onWhatsAppContinue }) {
+function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange, onGoogleContinue, googleClientId }) {
   const [signInError, setSignInError] = useState('');
   const [signInLoading, setSignInLoading] = useState(false);
+  const googleButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (role === 'admin' || !googleClientId || !window.google?.accounts?.id || !googleButtonRef.current) {
+      return;
+    }
+
+    googleButtonRef.current.innerHTML = '';
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text: 'continue_with',
+      shape: 'pill',
+      width: 320,
+    });
+  }, [role, googleClientId]);
 
   return (
     <section
@@ -160,48 +177,27 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange,
             ))}
           </div>
 
-          {role !== 'admin' && (
-            <>
-              <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                <button
-                  type="button"
-                  onClick={onGoogleContinue}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e2e8f0',
-                    background: '#f8fafc',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  onClick={onWhatsAppContinue}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #e2e8f0',
-                    background: '#fff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Continue with WhatsApp
-                </button>
-              </div>
+          <>
+            <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              
+              <div
+                ref={googleButtonRef}
+                style={{ display: role === 'admin' ? 'none' : 'flex', justifyContent: 'center', minHeight: '44px' }}
+                aria-label="Google sign in"
+              />
+              {role === 'admin' && (
+                <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', textAlign: 'center' }}>
+                  Google sign-in is available for User role only.
+                </p>
+              )}
+            </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: '#94a3b8' }}>
-                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-                <span style={{ fontSize: '0.85rem' }}>or use email</span>
-                <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-              </div>
-            </>
-          )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', color: '#94a3b8' }}>
+              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+              <span style={{ fontSize: '0.85rem' }}>or use email</span>
+              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+            </div>
+          </>
 
           <form
             onSubmit={async (event) => {
@@ -533,9 +529,26 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
 }
 
 export default function App() {
+  const CHATBOT_NAME = 'Agri Agent Assistant';
+  const DEFAULT_CHAT_GREETING = 'Hi, I am Agri Agent Assistant. Ask me about crops, pests, soil, fertilizers, or irrigation.';
+  const GUEST_SESSION_STORAGE_KEY = 'guestChatSessionId';
+
   const configuredApiOrigin = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').trim();
+  const rawGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+  const googleClientId = rawGoogleClientId.includes('your-google-web-client-id.apps.googleusercontent.com') ? '' : rawGoogleClientId;
   const normalizedApiOrigin = configuredApiOrigin ? configuredApiOrigin.replace(/\/+$/, '') : '';
   const apiBaseUrl = normalizedApiOrigin ? `${normalizedApiOrigin}/api` : '/api';
+
+  function getGuestSessionId() {
+    const existing = localStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+    if (existing) {
+      return existing;
+    }
+
+    const generated = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(GUEST_SESSION_STORAGE_KEY, generated);
+    return generated;
+  }
 
   async function authRequest(path, payload) {
     const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -559,35 +572,78 @@ export default function App() {
     return body;
   }
 
+  const applyAuthSuccess = (data) => {
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('authUser', JSON.stringify(data.user));
+    setCurrentUser(data.user);
+    setShowProfileMenu(false);
+    setShowSignIn(false);
+    setShowSignUp(false);
+    setShowDiseaseDetection(false);
+    setShowUserDashboard(false);
+
+    if (data.user?.role === 'admin') {
+      setShowAdminDashboard(true);
+    } else {
+      setShowAdminDashboard(false);
+      setActiveSection('home');
+    }
+  };
+
   async function apiRequest(path, options = {}) {
     const token = localStorage.getItem('authToken');
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
     const response = await fetch(`${apiBaseUrl}${path}`, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...(options.headers || {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
 
-    const body = await response.json().catch(() => ({}));
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const body = isJson ? await response.json().catch(() => ({})) : {};
 
     if (!response.ok) {
-      throw new Error(body.message || 'Request failed');
+      const error = new Error(body.message || 'Request failed');
+      error.code = body?.code;
+      error.details = body;
+      throw error;
     }
 
     return body;
   }
 
   const handleGoogleContinue = () => {
-    const googleAuthUrl =
-      'https://accounts.google.com/signin/v2/identifier?service=mail&flowName=GlifWebSignIn&flowEntry=ServiceLogin';
-    window.open(googleAuthUrl, '_blank', 'noopener,noreferrer');
+    if (!googleClientId) {
+      showToast('Google sign-in is not configured. Set a real VITE_GOOGLE_CLIENT_ID in frontend/.env and restart Vite.', 'error');
+      return;
+    }
+
+    if (!window.google?.accounts?.id) {
+      showToast('Google sign-in is loading. Please try again in a moment.', 'error');
+      return;
+    }
+
+    // Triggers Google account chooser popup when the user clicks the custom button.
+    window.google.accounts.id.prompt();
   };
 
-  const handleWhatsAppContinue = () => {
-    const message = encodeURIComponent('Hello Agri-Clinic, I want to continue sign in with WhatsApp.');
-    window.open(`https://wa.me/?text=${message}`, '_blank', 'noopener,noreferrer');
+  const handleGoogleCredential = async (credential) => {
+    if (!credential) {
+      return;
+    }
+
+    try {
+      const data = await authRequest('/auth/google', { credential });
+      applyAuthSuccess(data);
+      showToast('Signed in with Google successfully.');
+    } catch (err) {
+      showToast(err.message || 'Google sign-in failed.', 'error');
+    }
   };
 
   function getStoredUser() {
@@ -660,13 +716,93 @@ export default function App() {
   const [appointmentSubmitting, setAppointmentSubmitting] = useState(false);
   const [showDiseaseDetection, setShowDiseaseDetection] = useState(false);
   const [diseaseImage, setDiseaseImage] = useState(null);
+  const [diseaseImageFile, setDiseaseImageFile] = useState(null);
   const [predictedDisease, setPredictedDisease] = useState(null);
   const [detectionLoading, setDetectionLoading] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [guestPromptsRemaining, setGuestPromptsRemaining] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [chatMessages, setChatMessages] = useState([
+    {
+      role: 'assistant',
+      text: DEFAULT_CHAT_GREETING,
+    },
+  ]);
   const heroCycleRef = useRef(null);
   const heroSwitchRef = useRef(null);
   const productGridRef = useRef(null);
   const recommendedRef = useRef(null);
   const profileMenuRef = useRef(null);
+  const chatMessagesRef = useRef(null);
+  const guestSessionIdRef = useRef(getGuestSessionId());
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'success') => {
+    if (!message) {
+      return;
+    }
+
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
+    setToast({
+      id: Date.now(),
+      message,
+      type,
+    });
+
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimeoutRef.current = null;
+    }, 3200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!googleClientId) {
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+
+    const init = () => {
+      if (!window.google?.accounts?.id) {
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => {
+          handleGoogleCredential(response?.credential || '');
+        },
+        auto_select: false,
+        cancel_on_tap_outside: false,
+      });
+    };
+
+    script.onload = init;
+    init();
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, [googleClientId]);
 
   useEffect(() => {
     let loaded = 0;
@@ -737,6 +873,59 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isChatOpen) {
+      return;
+    }
+
+    const loadHistory = async () => {
+      try {
+        const data = await apiRequest('/chat/history', {
+          method: 'GET',
+          headers: currentUser ? undefined : { 'x-guest-session-id': guestSessionIdRef.current },
+        });
+
+        const mapped = (data.messages || []).flatMap((item) => [
+          { role: 'user', text: item.question },
+          { role: 'assistant', text: item.answer },
+        ]);
+
+        if (mapped.length > 0) {
+          setChatMessages(mapped);
+        } else {
+          setChatMessages([{ role: 'assistant', text: DEFAULT_CHAT_GREETING }]);
+        }
+
+        if (!currentUser && typeof data.guestPromptsRemaining === 'number') {
+          setGuestPromptsRemaining(data.guestPromptsRemaining);
+        }
+
+        if (currentUser) {
+          setGuestPromptsRemaining(null);
+        }
+      } catch {
+        setChatMessages([{ role: 'assistant', text: DEFAULT_CHAT_GREETING }]);
+      }
+    };
+
+    loadHistory();
+  }, [isChatOpen, currentUser, DEFAULT_CHAT_GREETING]);
+
+  useEffect(() => {
+    setChatMessages([{ role: 'assistant', text: DEFAULT_CHAT_GREETING }]);
+    if (currentUser) {
+      setGuestPromptsRemaining(null);
+    }
+  }, [currentUser, DEFAULT_CHAT_GREETING]);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      requestAnimationFrame(() => {
+        chatMessagesRef.current?.scrollTo({ top: chatMessagesRef.current.scrollHeight, behavior: 'smooth' });
+      });
+    }
+  }, [chatMessages, isChatOpen]);
+
+  useEffect(() => {
     const fetchAdminOrders = async () => {
       if (!showAdminDashboard || currentUser?.role !== 'admin') {
         return;
@@ -751,7 +940,7 @@ export default function App() {
           totalBuyers: data.totalBuyers || 0,
         });
       } catch (err) {
-        window.alert(err.message || 'Failed to load admin orders');
+        showToast(err.message || 'Failed to load admin orders', 'error');
       } finally {
         setAdminOrdersLoading(false);
       }
@@ -771,7 +960,7 @@ export default function App() {
         const data = await apiRequest('/appointments/admin', { method: 'GET' });
         setAppointments(data.appointments || []);
       } catch (err) {
-        window.alert(err.message || 'Failed to load appointments');
+        showToast(err.message || 'Failed to load appointments', 'error');
       } finally {
         setAppointmentsLoading(false);
       }
@@ -791,7 +980,7 @@ export default function App() {
         const data = await apiRequest('/orders/my', { method: 'GET' });
         setUserOrders(data.orders || []);
       } catch (err) {
-        window.alert(err.message || 'Failed to load your orders');
+        showToast(err.message || 'Failed to load your orders', 'error');
       } finally {
         setUserOrdersLoading(false);
       }
@@ -826,9 +1015,12 @@ export default function App() {
     setShowProfileMenu(false);
     setShowAdminDashboard(false);
     setShowUserDashboard(false);
+    setShowDiseaseDetection(false);
     setShowSignIn(false);
     setShowSignUp(false);
     setActiveSection('home');
+    setChatMessages([{ role: 'assistant', text: DEFAULT_CHAT_GREETING }]);
+    setGuestPromptsRemaining(null);
   };
 
   const categories = useMemo(() => ['all', ...Array.from(new Set(productsData.map((p) => p.category)))], [productsData]);
@@ -921,7 +1113,7 @@ export default function App() {
 
   const handleCheckout = async () => {
     if (!currentUser) {
-      window.alert('Please sign in to place an order.');
+      showToast('Please sign in to place an order.', 'error');
       setShowSignIn(true);
       setShowSignUp(false);
       setShowDiseaseDetection(false);
@@ -947,11 +1139,11 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      window.alert('Order placed successfully.');
+      showToast('Order placed successfully.');
       setCart({});
       setShowCart(false);
     } catch (err) {
-      window.alert(err.message || 'Failed to place order');
+      showToast(err.message || 'Failed to place order', 'error');
     } finally {
       setCheckoutLoading(false);
     }
@@ -1051,7 +1243,7 @@ export default function App() {
     event.preventDefault();
 
     if (!currentUser) {
-      window.alert('Please sign in to book an appointment.');
+      showToast('Please sign in to book an appointment.', 'error');
       setShowSignIn(true);
       setShowSignUp(false);
       setShowDiseaseDetection(false);
@@ -1080,7 +1272,7 @@ export default function App() {
         message: '',
       });
     } catch (err) {
-      window.alert(err.message || 'Failed to submit appointment');
+      showToast(err.message || 'Failed to submit appointment', 'error');
     } finally {
       setAppointmentSubmitting(false);
     }
@@ -1146,6 +1338,49 @@ export default function App() {
     setSortBy('featured');
   };
 
+  const handleChatSubmit = async (event) => {
+    event.preventDefault();
+    const question = chatInput.trim();
+    if (!question || chatLoading) {
+      return;
+    }
+
+    if (!currentUser && guestPromptsRemaining === 0) {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'You reached the free guest chat limit. Please sign in to continue chatting.',
+        },
+      ]);
+      return;
+    }
+
+    setChatInput('');
+    setChatMessages((prev) => [...prev, { role: 'user', text: question }]);
+    setChatLoading(true);
+
+    try {
+      const data = await apiRequest('/chat/ask', {
+        method: 'POST',
+        headers: currentUser ? undefined : { 'x-guest-session-id': guestSessionIdRef.current },
+        body: JSON.stringify({ question }),
+      });
+
+      setChatMessages((prev) => [...prev, { role: 'assistant', text: data.answer || 'No response received.' }]);
+      if (!currentUser && typeof data.guestPromptsRemaining === 'number') {
+        setGuestPromptsRemaining(data.guestPromptsRemaining);
+      }
+    } catch (err) {
+      if (!currentUser && err?.code === 'GUEST_PROMPT_LIMIT_EXCEEDED') {
+        setGuestPromptsRemaining(0);
+      }
+      setChatMessages((prev) => [...prev, { role: 'assistant', text: err.message || 'Failed to get response.' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const handleAdminEditSelect = (product) => {
     setAdminEditId(product.id);
     setAdminShowAllProducts(true);
@@ -1187,7 +1422,9 @@ export default function App() {
   const locationOptions = ['Pune', 'Nashik', 'Nagpur', 'Kolhapur', 'Sangli', 'Satara', 'Ahmednagar', 'Solapur', 'Amravati', 'Aurangabad'];
   const todayISO = new Date().toISOString().split('T')[0];
   const isAuthPage = showSignIn || showSignUp;
-  const showFullPage = !showSignIn && !showSignUp && !showAdminDashboard && !showUserDashboard && !showDiseaseDetection;
+  const canUseDiseaseDetection = Boolean(currentUser);
+  const showDiseasePage = showDiseaseDetection && canUseDiseaseDetection;
+  const showFullPage = !showSignIn && !showSignUp && !showAdminDashboard && !showUserDashboard && !showDiseasePage;
 
   const adminFilteredProducts = useMemo(() => {
     const needle = adminProductSearch.trim().toLowerCase();
@@ -1198,42 +1435,12 @@ export default function App() {
     });
   }, [adminProductSearch, adminProductCategory, productsData]);
 
-  const diseaseDatabase = {
-    'Leaf Spot': {
-      name: 'Leaf Spot',
-      description: 'Fungal or bacterial disease causing brown/black spots on leaves.',
-      recommendations: ['Fungicide', 'Pesticide'],
-    },
-    'Powdery Mildew': {
-      name: 'Powdery Mildew',
-      description: 'White powder-like coating on leaves and stems.',
-      recommendations: ['Fungicide'],
-    },
-    'Blight': {
-      name: 'Blight',
-      description: 'Destructive disease causing wilting and tissue death.',
-      recommendations: ['Fungicide', 'Pesticide'],
-    },
-    'Rust': {
-      name: 'Rust',
-      description: 'Orange, brown, or yellow rust-like pustules on leaves.',
-      recommendations: ['Fungicide'],
-    },
-    'Root Rot': {
-      name: 'Root Rot',
-      description: 'Decay of plant roots, often caused by fungi or bacteria.',
-      recommendations: ['Fungicide'],
-    },
-    'Mosaic Virus': {
-      name: 'Mosaic Virus',
-      description: 'Mottled, discolored, or distorted leaves from viral infection.',
-      recommendations: ['Pesticide'],
-    },
-  };
-
   const handleDiseaseImageUpload = (event) => {
     const file = event.target.files?.[0];
     if (file) {
+      setDiseaseImageFile(file);
+      setPredictedDisease(null);
+
       const reader = new FileReader();
       reader.onload = (e) => {
         setDiseaseImage(e.target?.result);
@@ -1243,17 +1450,27 @@ export default function App() {
   };
 
   const predictPlantDisease = async () => {
-    if (!diseaseImage) return;
+    if (!diseaseImageFile) return;
 
     setDetectionLoading(true);
-    
+
     try {
-      const diseases = Object.values(diseaseDatabase);
-      const randomDisease = diseases[Math.floor(Math.random() * diseases.length)];
-      
-      setPredictedDisease(randomDisease);
+      const formData = new FormData();
+      formData.append('image', diseaseImageFile);
+
+      const data = await apiRequest('/disease/predict', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!data?.disease) {
+        throw new Error('Prediction service returned an empty result.');
+      }
+
+      setPredictedDisease(data.disease);
     } catch (error) {
       console.error('Disease prediction error:', error);
+      showToast(error.message || 'Failed to predict disease. Please try again.', 'error');
     } finally {
       setDetectionLoading(false);
     }
@@ -1274,6 +1491,20 @@ export default function App() {
 
   return (
     <div style={{ background: '#f8fafc', minHeight: '100vh' }}>
+      {toast && (
+        <div key={toast.id} className={`app-toast app-toast--${toast.type}`} role="status" aria-live="polite">
+          <span>{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss notification"
+            className="app-toast__close"
+          >
+            X
+          </button>
+        </div>
+      )}
+
       {/* Navigation Bar */}
       <nav style={{ background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -1292,6 +1523,11 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
+                if (!currentUser) {
+                  showToast('Sign in to check disease.', 'error');
+                  return;
+                }
+
                 setShowDiseaseDetection(true);
                 setShowSignIn(false);
                 setShowSignUp(false);
@@ -1472,7 +1708,7 @@ export default function App() {
           role={signInRole}
           onRoleChange={setSignInRole}
           onGoogleContinue={handleGoogleContinue}
-          onWhatsAppContinue={handleWhatsAppContinue}
+          googleClientId={googleClientId}
           onCreateAccount={() => {
             setShowSignIn(false);
             setShowDiseaseDetection(false);
@@ -1480,23 +1716,8 @@ export default function App() {
           }}
           onSignIn={async ({ role, email, password }) => {
             const data = await authRequest('/auth/login', { email, password, role });
-            localStorage.setItem('authToken', data.token);
-            localStorage.setItem('authUser', JSON.stringify(data.user));
-            setCurrentUser(data.user);
-            setShowProfileMenu(false);
-            window.alert('You are signed in.');
-
-            setShowSignIn(false);
-            setShowSignUp(false);
-            setShowDiseaseDetection(false);
-            setShowUserDashboard(false);
-
-            if (data.user?.role === 'admin') {
-              setShowAdminDashboard(true);
-            } else {
-              setShowAdminDashboard(false);
-              setActiveSection('home');
-            }
+            applyAuthSuccess(data);
+            showToast('You are signed in.');
           }}
         />
       )}
@@ -1516,7 +1737,7 @@ export default function App() {
               throw new Error('Signup failed. Please try again.');
             }
 
-            window.alert('Account created successfully. Please sign in.');
+            showToast('Account created successfully. Please sign in.');
             setShowSignUp(false);
             setShowSignIn(true);
             setShowDiseaseDetection(false);
@@ -1959,7 +2180,7 @@ export default function App() {
         </section>
       )}
 
-      {showDiseaseDetection && (
+      {showDiseasePage && (
         <section
           style={{
             padding: '4rem 2rem',
@@ -1983,6 +2204,7 @@ export default function App() {
                   setShowDiseaseDetection(false);
                   setPredictedDisease(null);
                   setDiseaseImage(null);
+                  setDiseaseImageFile(null);
                   setActiveSection('home');
                 }}
                 style={{
@@ -2134,6 +2356,11 @@ export default function App() {
                     >
                       View Recommended Products
                     </button>
+                    {typeof predictedDisease.confidence === 'number' && (
+                      <div style={{ fontSize: '0.9rem', color: '#fef08a', marginTop: '0.2rem' }}>
+                        Model confidence: {(predictedDisease.confidence * 100).toFixed(1)}%
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2956,6 +3183,158 @@ export default function App() {
               </div>
             </div>
           </footer>
+
+          <button
+            type="button"
+            onClick={() => setIsChatOpen((prev) => !prev)}
+            aria-label="Toggle chatbot"
+            style={{
+              position: 'fixed',
+              right: '1.2rem',
+              bottom: '1.2rem',
+              zIndex: 150,
+              width: '58px',
+              height: '58px',
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.35)',
+              background: 'linear-gradient(120deg, #0f766e, #059669)',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '1.3rem',
+              boxShadow: '0 14px 28px rgba(15, 118, 110, 0.35)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {isChatOpen ? 'X' : '✦'}
+          </button>
+
+          {isChatOpen && (
+            <section
+              style={{
+                position: 'fixed',
+                right: '1.2rem',
+                bottom: '5.5rem',
+                width: 'min(380px, 92vw)',
+                height: 'min(520px, 72vh)',
+                background: '#fff',
+                borderRadius: '1rem',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 18px 40px rgba(15, 23, 42, 0.26)',
+                zIndex: 150,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ padding: '0.85rem 1rem', background: 'linear-gradient(120deg, #0f766e, #059669)', color: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '1.05rem' }}>🌱</span>
+                    <div style={{ fontWeight: 700 }}>{CHATBOT_NAME}</div>
+                  </div>
+                  {!currentUser && (
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.2)', padding: '0.2rem 0.45rem', borderRadius: '999px' }}>Guest mode</span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.82rem', opacity: 0.95 }}>Ask about crop care, pests, soil, or fertilizers</div>
+                {!currentUser && (
+                  <div style={{ marginTop: '0.45rem', fontSize: '0.78rem', opacity: 0.98 }}>
+                    {typeof guestPromptsRemaining === 'number'
+                      ? `${guestPromptsRemaining} free prompts left. Sign in for unlimited chat and saved history.`
+                      : 'Sign in for unlimited chat and saved history.'}
+                  </div>
+                )}
+              </div>
+
+              <div ref={chatMessagesRef} style={{ flex: 1, overflowY: 'auto', padding: '0.9rem', background: '#f8fafc', display: 'grid', gap: '0.7rem' }}>
+                {chatMessages.map((message, index) => (
+                  <div
+                    key={`${message.role}-${index}`}
+                    style={{
+                      justifySelf: message.role === 'user' ? 'end' : 'start',
+                      maxWidth: '88%',
+                      background: message.role === 'user' ? '#dcfce7' : '#fff',
+                      color: '#0f172a',
+                      border: `1px solid ${message.role === 'user' ? '#86efac' : '#e2e8f0'}`,
+                      borderRadius: '0.75rem',
+                      padding: '0.62rem 0.72rem',
+                      fontSize: '0.92rem',
+                      lineHeight: 1.45,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {message.text}
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div style={{ justifySelf: 'start', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '0.62rem 0.72rem', fontSize: '0.9rem', color: '#475569' }}>
+                    Thinking...
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={handleChatSubmit} style={{ borderTop: '1px solid #e2e8f0', padding: '0.7rem', display: 'flex', gap: '0.5rem', background: '#fff' }}>
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  placeholder="Type your farming question..."
+                  style={{
+                    flex: 1,
+                    padding: '0.62rem 0.7rem',
+                    borderRadius: '0.6rem',
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    fontSize: '0.92rem',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={chatLoading || !chatInput.trim() || (!currentUser && guestPromptsRemaining === 0)}
+                  style={{
+                    padding: '0.62rem 0.88rem',
+                    borderRadius: '0.6rem',
+                    border: 'none',
+                    background: '#059669',
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: chatLoading || !chatInput.trim() || (!currentUser && guestPromptsRemaining === 0) ? 'not-allowed' : 'pointer',
+                    opacity: chatLoading || !chatInput.trim() || (!currentUser && guestPromptsRemaining === 0) ? 0.8 : 1,
+                  }}
+                >
+                  Send
+                </button>
+              </form>
+
+              {!currentUser && guestPromptsRemaining === 0 && (
+                <div style={{ borderTop: '1px solid #e2e8f0', padding: '0.65rem 0.7rem', background: '#f0fdf4', color: '#166534', fontSize: '0.83rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' }}>
+                  <span>Free guest prompts are over. Sign in to continue.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSignUp(false);
+                      setSignInRole('user');
+                      setShowSignIn(true);
+                    }}
+                    style={{
+                      border: '1px solid #16a34a',
+                      borderRadius: '999px',
+                      background: '#dcfce7',
+                      color: '#166534',
+                      fontWeight: 700,
+                      fontSize: '0.76rem',
+                      padding: '0.3rem 0.65rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Sign in
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
         </>
       )}
     </div>
