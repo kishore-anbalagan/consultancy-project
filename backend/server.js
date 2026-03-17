@@ -10,17 +10,21 @@ const { port } = require('./config/appConfig');
 const { connectDB } = require('./config/db');
 const app = express();
 
-const defaultAllowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 const configuredOrigins = String(process.env.CORS_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : defaultAllowedOrigins;
+const allowedOrigins = configuredOrigins;
 
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) {
+      return callback(null, true);
+    }
+
+    // When CORS_ORIGINS is not configured, allow origins in development.
+    if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
       return callback(null, true);
     }
 

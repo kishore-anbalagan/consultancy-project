@@ -2358,7 +2358,7 @@ export default function App() {
                     </button>
                     {typeof predictedDisease.confidence === 'number' && (
                       <div style={{ fontSize: '0.9rem', color: '#fef08a', marginTop: '0.2rem' }}>
-                        Model confidence: {(predictedDisease.confidence * 100).toFixed(1)}%
+                        {/* Model confidence: {(predictedDisease.confidence * 100).toFixed(1)}% */}
                       </div>
                     )}
                   </div>
