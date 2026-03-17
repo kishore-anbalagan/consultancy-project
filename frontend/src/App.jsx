@@ -534,10 +534,34 @@ export default function App() {
   const GUEST_SESSION_STORAGE_KEY = 'guestChatSessionId';
 
   const configuredApiOrigin = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '').trim();
+  const razorpayKeyId = (import.meta.env.VITE_RAZORPAY_KEY_ID || '').trim();
   const rawGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
   const googleClientId = rawGoogleClientId.includes('your-google-web-client-id.apps.googleusercontent.com') ? '' : rawGoogleClientId;
   const normalizedApiOrigin = configuredApiOrigin ? configuredApiOrigin.replace(/\/+$/, '') : '';
   const apiBaseUrl = normalizedApiOrigin ? `${normalizedApiOrigin}/api` : '/api';
+
+  async function loadRazorpayScript() {
+    if (window.Razorpay) {
+      return true;
+    }
+
+    return new Promise((resolve) => {
+      const existing = document.querySelector('script[data-razorpay="checkout"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(true), { once: true });
+        existing.addEventListener('error', () => resolve(false), { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.dataset.razorpay = 'checkout';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  }
 
   function getGuestSessionId() {
     const existing = localStorage.getItem(GUEST_SESSION_STORAGE_KEY);
@@ -1124,6 +1148,11 @@ export default function App() {
       return;
     }
 
+    if (!razorpayKeyId) {
+      showToast('Razorpay is not configured. Missing VITE_RAZORPAY_KEY_ID.', 'error');
+      return;
+    }
+
     const payload = {
       items: cartItems.map((item) => ({
         productId: item.id,
@@ -1135,17 +1164,68 @@ export default function App() {
 
     setCheckoutLoading(true);
     try {
-      await apiRequest('/orders', {
+      const orderInit = await apiRequest('/orders/razorpay/order', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      showToast('Order placed successfully.');
-      setCart({});
-      setShowCart(false);
+
+      const scriptReady = await loadRazorpayScript();
+      if (!scriptReady || !window.Razorpay) {
+        throw new Error('Unable to load Razorpay checkout. Please try again.');
+      }
+
+      const razorpay = new window.Razorpay({
+        key: orderInit.keyId || razorpayKeyId,
+        amount: orderInit.amount,
+        currency: orderInit.currency,
+        name: 'Agri-Clinic',
+        description: `Order payment (${cartItems.length} item${cartItems.length > 1 ? 's' : ''})`,
+        order_id: orderInit.razorpayOrderId,
+        prefill: {
+          name: currentUser?.name || '',
+          email: currentUser?.email || '',
+          contact: currentUser?.phone || '',
+        },
+        theme: {
+          color: '#0f766e',
+        },
+        modal: {
+          ondismiss: () => {
+            setCheckoutLoading(false);
+            showToast('Payment cancelled.', 'error');
+          },
+        },
+        handler: async (paymentResponse) => {
+          try {
+            await apiRequest('/orders/razorpay/verify', {
+              method: 'POST',
+              body: JSON.stringify({
+                ...payload,
+                ...paymentResponse,
+              }),
+            });
+
+            showToast('Payment successful. Order placed successfully.');
+            setCart({});
+            setShowCart(false);
+          } catch (err) {
+            showToast(err.message || 'Payment verification failed. Please contact support.', 'error');
+          } finally {
+            setCheckoutLoading(false);
+          }
+        },
+      });
+
+      razorpay.on('payment.failed', (response) => {
+        const reason = response?.error?.description || 'Payment failed. Please try again.';
+        showToast(reason, 'error');
+        setCheckoutLoading(false);
+      });
+
+      razorpay.open();
     } catch (err) {
-      showToast(err.message || 'Failed to place order', 'error');
-    } finally {
       setCheckoutLoading(false);
+      showToast(err.message || 'Failed to place order', 'error');
     }
   };
 

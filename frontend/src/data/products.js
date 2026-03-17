@@ -6,7 +6,7 @@ const products = [
     category: 'Pesticide',
     type: 'Liquid',
     brand: 'AgraSafe',
-    price: 450.0,
+    price: 2,
     currency: 'INR',
     description: 'Broad-spectrum insecticide for vegetables and field crops.',
     ingredients: 'Lambda-cyhalothrin 2.5%',
