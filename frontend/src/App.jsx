@@ -934,6 +934,7 @@ export default function App() {
   const [showDiseaseDetection, setShowDiseaseDetection] = useState(false);
   const [diseaseImage, setDiseaseImage] = useState(null);
   const [diseaseImageFile, setDiseaseImageFile] = useState(null);
+  const [isDiseaseDropActive, setIsDiseaseDropActive] = useState(false);
   const [predictedDisease, setPredictedDisease] = useState(null);
   const [detectionLoading, setDetectionLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -952,6 +953,7 @@ export default function App() {
   const heroSwitchRef = useRef(null);
   const productGridRef = useRef(null);
   const recommendedRef = useRef(null);
+  const diseaseFileInputRef = useRef(null);
   const profileMenuRef = useRef(null);
   const chatMessagesRef = useRef(null);
   const guestSessionIdRef = useRef(getGuestSessionId());
@@ -1839,18 +1841,56 @@ export default function App() {
     });
   }, [adminProductSearch, adminProductCategory, productsData]);
 
+  const processDiseaseFile = (file) => {
+    if (!file) {
+      return;
+    }
+
+    if (!String(file.type || '').startsWith('image/')) {
+      showToast('Please upload an image file only (PNG, JPG, JPEG).', 'error');
+      return;
+    }
+
+    const maxBytes = 10 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      showToast('Image is too large. Please choose a file up to 10MB.', 'error');
+      return;
+    }
+
+    setDiseaseImageFile(file);
+    setPredictedDisease(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setDiseaseImage(e.target?.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleDiseaseImageUpload = (event) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setDiseaseImageFile(file);
-      setPredictedDisease(null);
+    processDiseaseFile(file);
+  };
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setDiseaseImage(e.target?.result);
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleDiseaseDrop = (event) => {
+    event.preventDefault();
+    setIsDiseaseDropActive(false);
+    const file = event.dataTransfer?.files?.[0];
+    processDiseaseFile(file);
+  };
+
+  const handleDiseaseDragOver = (event) => {
+    event.preventDefault();
+    setIsDiseaseDropActive(true);
+  };
+
+  const handleDiseaseDragLeave = (event) => {
+    event.preventDefault();
+    setIsDiseaseDropActive(false);
+  };
+
+  const openDiseaseFilePicker = () => {
+    diseaseFileInputRef.current?.click();
   };
 
   const predictPlantDisease = async () => {
@@ -2724,14 +2764,26 @@ export default function App() {
               <div style={{ background: '#0f172a', borderRadius: '1rem', padding: '2rem', border: '1px solid rgba(255,255,255,0.15)' }}>
                 <div style={{ fontWeight: 700, marginBottom: '1rem', fontSize: '1.2rem' }}>Upload Plant Image</div>
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={openDiseaseFilePicker}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openDiseaseFilePicker();
+                    }
+                  }}
+                  onDragOver={handleDiseaseDragOver}
+                  onDrop={handleDiseaseDrop}
+                  onDragLeave={handleDiseaseDragLeave}
                   style={{
-                    border: '2px dashed rgba(255,255,255,0.3)',
+                    border: isDiseaseDropActive ? '2px dashed rgba(94,234,212,0.95)' : '2px dashed rgba(255,255,255,0.3)',
                     borderRadius: '1rem',
                     padding: '2rem',
                     textAlign: 'center',
                     marginBottom: '1rem',
                     cursor: 'pointer',
-                    background: diseaseImage ? 'rgba(16,185,129,0.1)' : 'transparent',
+                    background: isDiseaseDropActive ? 'rgba(20,184,166,0.2)' : diseaseImage ? 'rgba(16,185,129,0.1)' : 'transparent',
                     transition: 'all 0.3s ease',
                   }}
                 >
@@ -2743,42 +2795,40 @@ export default function App() {
                   ) : (
                     <div>
                       <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📸</div>
-                      <div style={{ color: '#cbd5f5', marginBottom: '0.5rem' }}>Click to upload or drag & drop</div>
+                      <div style={{ color: '#cbd5f5', marginBottom: '0.5rem' }}>
+                        {isDiseaseDropActive ? 'Drop image here' : 'Click to upload or drag & drop'}
+                      </div>
                       <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>PNG, JPG up to 10MB</div>
                     </div>
                   )}
                   <input
+                    ref={diseaseFileInputRef}
                     type="file"
                     accept="image/*"
                     onChange={handleDiseaseImageUpload}
                     style={{
-                      position: 'absolute',
-                      width: 0,
-                      height: 0,
-                      opacity: 0,
+                      display: 'none',
                     }}
                     id="disease-image-input"
                   />
                 </div>
-                <label htmlFor="disease-image-input">
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById('disease-image-input')?.click()}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '0.6rem',
-                      border: '1px solid rgba(94,234,212,0.6)',
-                      background: 'rgba(15,118,110,0.35)',
-                      color: '#a7f3d0',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      marginBottom: '0.75rem',
-                    }}
-                  >
-                    Choose Image
-                  </button>
-                </label>
+                <button
+                  type="button"
+                  onClick={openDiseaseFilePicker}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '0.6rem',
+                    border: '1px solid rgba(94,234,212,0.6)',
+                    background: 'rgba(15,118,110,0.35)',
+                    color: '#a7f3d0',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  Choose Image
+                </button>
                 {diseaseImage && (
                   <button
                     type="button"
