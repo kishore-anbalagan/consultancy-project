@@ -173,4 +173,24 @@ async function getHistory(req, res, next) {
   }
 }
 
-module.exports = { askQuestion, getHistory };
+async function clearHistory(req, res, next) {
+  try {
+    const guestSessionId = getGuestSessionId(req);
+    if (!req.user?.id && !guestSessionId) {
+      return res.status(400).json({ message: 'Missing guest session id', code: 'MISSING_GUEST_SESSION' });
+    }
+
+    const filter = req.user?.id ? { user: req.user.id } : { guestSessionId };
+    await ChatMessage.deleteMany(filter);
+
+    return res.json({
+      message: 'Chat history deleted successfully.',
+      guestPromptsRemaining: req.user?.id ? undefined : GUEST_PROMPT_LIMIT,
+      promptLimit: req.user?.id ? undefined : GUEST_PROMPT_LIMIT,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { askQuestion, getHistory, clearHistory };

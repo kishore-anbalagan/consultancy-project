@@ -199,4 +199,36 @@ async function googleLogin(req, res, next) {
   }
 }
 
-module.exports = { signup, login, googleLogin };
+async function forgotPassword(req, res, next) {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const newPassword = String(req.body?.newPassword || '');
+    const confirmPassword = String(req.body?.confirmPassword || '');
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'No account found for this email' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    return res.json({ message: 'Password reset successful. Please sign in with your new password.' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { signup, login, googleLogin, forgotPassword };

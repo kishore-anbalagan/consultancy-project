@@ -32,10 +32,18 @@ const heroImages = [
   'https://img.freepik.com/premium-photo/village-old-farmer-is-working-green-planting-paddy-seeds-weed-out-grass_709167-309.jpg',
 ];
 
-function SignInSection({ onSignIn, onCreateAccount, onReturnToSite, role = 'user', onRoleChange, onGoogleContinue, googleClientId }) {
+function SignInSection({ onSignIn, onForgotPassword, onCreateAccount, onReturnToSite, role = 'user', onRoleChange, onGoogleContinue, googleClientId }) {
   const [signInError, setSignInError] = useState('');
   const [signInLoading, setSignInLoading] = useState(false);
   const [showSignInPassword, setShowSignInPassword] = useState(false);
+  const [showForgotPasswordForm, setShowForgotPasswordForm] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
   const googleButtonRef = useRef(null);
 
   useEffect(() => {
@@ -273,10 +281,101 @@ function SignInSection({ onSignIn, onCreateAccount, onReturnToSite, role = 'user
                 <input type="checkbox" defaultChecked />
                 Remember me
               </label>
-              <button type="button" style={{ border: 'none', background: 'transparent', color: '#0f766e', cursor: 'pointer', fontWeight: 600 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPasswordForm((prev) => !prev);
+                  setForgotPasswordError('');
+                }}
+                style={{ border: 'none', background: 'transparent', color: '#0f766e', cursor: 'pointer', fontWeight: 600 }}
+              >
                 Forgot password?
               </button>
             </div>
+
+            {showForgotPasswordForm && (
+              <div style={{ display: 'grid', gap: '0.65rem', padding: '0.9rem', borderRadius: '0.75rem', border: '1px solid #bae6fd', background: '#f0f9ff' }}>
+                <div style={{ fontSize: '0.86rem', color: '#0f172a', fontWeight: 700 }}>Reset password</div>
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(event) => setForgotEmail(event.target.value)}
+                  placeholder="Enter your account email"
+                  style={{ padding: '0.65rem 0.75rem', borderRadius: '0.65rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <input
+                    type={showForgotNewPassword ? 'text' : 'password'}
+                    value={forgotNewPassword}
+                    onChange={(event) => setForgotNewPassword(event.target.value)}
+                    placeholder="New password"
+                    style={{ flex: 1, padding: '0.65rem 0.75rem', borderRadius: '0.65rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotNewPassword((prev) => !prev)}
+                    style={{ padding: '0.5rem 0.72rem', borderRadius: '0.6rem', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    {showForgotNewPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <input
+                    type={showForgotConfirmPassword ? 'text' : 'password'}
+                    value={forgotConfirmPassword}
+                    onChange={(event) => setForgotConfirmPassword(event.target.value)}
+                    placeholder="Confirm new password"
+                    style={{ flex: 1, padding: '0.65rem 0.75rem', borderRadius: '0.65rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotConfirmPassword((prev) => !prev)}
+                    style={{ padding: '0.5rem 0.72rem', borderRadius: '0.6rem', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    {showForgotConfirmPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPasswordForm(false);
+                      setForgotPasswordError('');
+                    }}
+                    style={{ padding: '0.55rem 0.8rem', borderRadius: '0.6rem', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={forgotPasswordLoading}
+                    onClick={async () => {
+                      setForgotPasswordError('');
+                      setForgotPasswordLoading(true);
+                      try {
+                        await onForgotPassword?.({
+                          email: forgotEmail,
+                          newPassword: forgotNewPassword,
+                          confirmPassword: forgotConfirmPassword,
+                        });
+                        setForgotEmail('');
+                        setForgotNewPassword('');
+                        setForgotConfirmPassword('');
+                        setShowForgotPasswordForm(false);
+                      } catch (err) {
+                        setForgotPasswordError(err.message || 'Password reset failed. Please try again.');
+                      } finally {
+                        setForgotPasswordLoading(false);
+                      }
+                    }}
+                    style={{ padding: '0.55rem 0.8rem', borderRadius: '0.6rem', border: 'none', background: '#0f766e', color: '#fff', cursor: forgotPasswordLoading ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: forgotPasswordLoading ? 0.8 : 1 }}
+                  >
+                    {forgotPasswordLoading ? 'Updating...' : 'Update password'}
+                  </button>
+                </div>
+                {forgotPasswordError && <div style={{ color: '#dc2626', fontSize: '0.84rem', fontWeight: 600 }}>{forgotPasswordError}</div>}
+              </div>
+            )}
 
             <button
               type="submit"
@@ -840,6 +939,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatHistoryClearing, setChatHistoryClearing] = useState(false);
   const [guestPromptsRemaining, setGuestPromptsRemaining] = useState(null);
   const [toast, setToast] = useState(null);
   const [chatMessages, setChatMessages] = useState([
@@ -1652,6 +1752,37 @@ export default function App() {
     }
   };
 
+  const handleClearChatHistory = async () => {
+    if (chatHistoryClearing || chatLoading) {
+      return;
+    }
+
+    const hasHistory = chatMessages.some((message) => message.role === 'user');
+    if (!hasHistory) {
+      showToast('No chat history to delete.', 'error');
+      return;
+    }
+
+    setChatHistoryClearing(true);
+    try {
+      const data = await apiRequest('/chat/history', {
+        method: 'DELETE',
+        headers: currentUser ? undefined : { 'x-guest-session-id': guestSessionIdRef.current },
+      });
+
+      setChatMessages([{ role: 'assistant', text: DEFAULT_CHAT_GREETING }]);
+      setChatInput('');
+      if (!currentUser && typeof data.guestPromptsRemaining === 'number') {
+        setGuestPromptsRemaining(data.guestPromptsRemaining);
+      }
+      showToast('Chat history deleted.');
+    } catch (err) {
+      showToast(err.message || 'Failed to delete chat history.', 'error');
+    } finally {
+      setChatHistoryClearing(false);
+    }
+  };
+
   const handleAdminEditSelect = (product) => {
     setAdminEditId(product.id);
     setAdminShowAllProducts(true);
@@ -1789,12 +1920,16 @@ export default function App() {
             {!isAuthPage && (
               <>
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
-                  <button onClick={() => scrollToSection('home')} style={{ background: 'none', border: 'none', color: activeSection === 'home' ? '#059669' : '#6b7280', fontWeight: activeSection === 'home' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Home</button>
-                  <button onClick={() => scrollToSection('about')} style={{ background: 'none', border: 'none', color: activeSection === 'about' ? '#059669' : '#6b7280', fontWeight: activeSection === 'about' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>About Us</button>
-                  <button onClick={() => scrollToSection('explore')} style={{ background: 'none', border: 'none', color: activeSection === 'explore' ? '#059669' : '#6b7280', fontWeight: activeSection === 'explore' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Explore</button>
-                  <button onClick={() => scrollToSection('reviews')} style={{ background: 'none', border: 'none', color: activeSection === 'reviews' ? '#059669' : '#6b7280', fontWeight: activeSection === 'reviews' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Reviews</button>
-                  <button onClick={() => scrollToSection('gallery')} style={{ background: 'none', border: 'none', color: activeSection === 'gallery' ? '#059669' : '#6b7280', fontWeight: activeSection === 'gallery' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Gallery</button>
-                  <button onClick={() => scrollToSection('contact')} style={{ background: 'none', border: 'none', color: activeSection === 'contact' ? '#059669' : '#6b7280', fontWeight: activeSection === 'contact' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Contact</button>
+                  {!showDiseasePage && (
+                    <>
+                      <button onClick={() => scrollToSection('home')} style={{ background: 'none', border: 'none', color: activeSection === 'home' ? '#059669' : '#6b7280', fontWeight: activeSection === 'home' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Home</button>
+                      <button onClick={() => scrollToSection('about')} style={{ background: 'none', border: 'none', color: activeSection === 'about' ? '#059669' : '#6b7280', fontWeight: activeSection === 'about' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>About Us</button>
+                      <button onClick={() => scrollToSection('explore')} style={{ background: 'none', border: 'none', color: activeSection === 'explore' ? '#059669' : '#6b7280', fontWeight: activeSection === 'explore' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Explore</button>
+                      <button onClick={() => scrollToSection('reviews')} style={{ background: 'none', border: 'none', color: activeSection === 'reviews' ? '#059669' : '#6b7280', fontWeight: activeSection === 'reviews' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Reviews</button>
+                      <button onClick={() => scrollToSection('gallery')} style={{ background: 'none', border: 'none', color: activeSection === 'gallery' ? '#059669' : '#6b7280', fontWeight: activeSection === 'gallery' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Gallery</button>
+                      <button onClick={() => scrollToSection('contact')} style={{ background: 'none', border: 'none', color: activeSection === 'contact' ? '#059669' : '#6b7280', fontWeight: activeSection === 'contact' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Contact</button>
+                    </>
+                  )}
                   {!isAdminUser && (
                     <button
                       type="button"
@@ -2018,6 +2153,13 @@ export default function App() {
             const data = await authRequest('/auth/login', { email, password, role });
             applyAuthSuccess(data);
             showToast('You are signed in.');
+          }}
+          onForgotPassword={async ({ email, newPassword, confirmPassword }) => {
+            await apiRequest('/auth/forgot-password', {
+              method: 'POST',
+              body: JSON.stringify({ email, newPassword, confirmPassword }),
+            });
+            showToast('Password reset successful. Please sign in with your new password.');
           }}
         />
       )}
@@ -2784,13 +2926,17 @@ export default function App() {
                 aria-label="Shopping Cart"
                 style={{
                   position: 'absolute',
-                  top: 0,
+                  top: '50%',
                   right: 0,
-                  height: '100%',
+                  transform: 'translateY(-50%)',
+                  height: 'clamp(340px, 52vh, 560px)',
                   width: 'min(420px, 92vw)',
                   background: 'linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%)',
-                  borderLeft: '1px solid #a7f3d0',
-                  boxShadow: '-12px 0 35px rgba(15, 23, 42, 0.25)',
+                  border: '1px solid rgba(134, 239, 172, 0.85)',
+                  borderRight: 'none',
+                  borderRadius: '1.1rem 0 0 1.1rem',
+                  boxShadow: '-18px 14px 38px rgba(15, 23, 42, 0.22)',
+                  backdropFilter: 'blur(3px)',
                   display: 'flex',
                   flexDirection: 'column',
                 }}
@@ -3505,28 +3651,33 @@ export default function App() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
                   gap: '2.25rem',
                   alignItems: 'start',
+                  justifyItems: 'center',
+                  textAlign: 'center',
                   marginBottom: '2rem',
                 }}
               >
                 <div style={{ display: 'grid', alignContent: 'start', gap: '0.85rem' }}>
                   <h3 style={{ margin: '0 0 1rem 0', color: '#fff' }}>🌾 Agri-Clinic</h3>
-                  <p style={{ margin: 0, lineHeight: 1.45 }}>Empowering farmers with quality products and expert advice.</p>
+                  <p style={{ margin: 0, lineHeight: 1.45, maxWidth: '340px' }}>Empowering farmers with quality products and expert advice.</p>
                 </div>
                 <div style={{ display: 'grid', alignContent: 'start', gap: '0.85rem' }}>
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#fff' }}>Quick Links</h4>
-                  <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: '0.5rem' }}>
-                    <li><a href="#home" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Home</a></li>
-                    <li><a href="#about" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>About</a></li>
-                    <li><a href="#explore" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Products</a></li>
-                    <li><a href="#contact" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Contact</a></li>
-                  </ul>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                    <a href="#home" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Home</a>
+                    <span style={{ color: '#6b7280' }}>|</span>
+                    <a href="#about" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>About</a>
+                    <span style={{ color: '#6b7280' }}>|</span>
+                    <a href="#explore" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Products</a>
+                    <span style={{ color: '#6b7280' }}>|</span>
+                    <a href="#contact" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Contact</a>
+                  </div>
                 </div>
                 <div style={{ display: 'grid', alignContent: 'start', gap: '0.5rem' }}>
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#fff' }}>Address</h4>
-                  <p style={{ margin: 0, lineHeight: 1.5 }}>
+                  <p style={{ margin: 0, lineHeight: 1.5, maxWidth: '360px' }}>
                     Rasi Agri Clinic<br></br>
                     116/1, Panchamuga Vinayagar Kovil Opp, P. Velur, Namakkal Dt, Tamil Nadu
                   </p>
@@ -3630,6 +3781,24 @@ export default function App() {
               </div>
 
               <form onSubmit={handleChatSubmit} style={{ borderTop: '1px solid #e2e8f0', padding: '0.7rem', display: 'flex', gap: '0.5rem', background: '#fff' }}>
+                <button
+                  type="button"
+                  onClick={handleClearChatHistory}
+                  disabled={chatHistoryClearing || chatLoading || !chatMessages.some((message) => message.role === 'user')}
+                  style={{
+                    padding: '0.62rem 0.72rem',
+                    borderRadius: '0.6rem',
+                    border: '1px solid #d1d5db',
+                    background: '#f8fafc',
+                    color: '#374151',
+                    fontWeight: 700,
+                    cursor: chatHistoryClearing || chatLoading || !chatMessages.some((message) => message.role === 'user') ? 'not-allowed' : 'pointer',
+                    opacity: chatHistoryClearing || chatLoading || !chatMessages.some((message) => message.role === 'user') ? 0.7 : 1,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {chatHistoryClearing ? 'Deleting...' : 'Clear'}
+                </button>
                 <input
                   type="text"
                   value={chatInput}
