@@ -6,6 +6,26 @@ const { roles } = require('../models/User');
 const FIXED_ADMIN_EMAIL = 'agri@gmail.com';
 const FIXED_ADMIN_PASSWORD = 'agri@123';
 
+async function isValidAdminAuthorizer(email, password) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedPassword = String(password || '');
+
+  if (!normalizedEmail || !normalizedPassword) {
+    return false;
+  }
+
+  if (normalizedEmail === FIXED_ADMIN_EMAIL && normalizedPassword === FIXED_ADMIN_PASSWORD) {
+    return true;
+  }
+
+  const adminUser = await User.findOne({ email: normalizedEmail, role: 'admin' });
+  if (!adminUser) {
+    return false;
+  }
+
+  return adminUser.comparePassword(normalizedPassword);
+}
+
 function signToken(user) {
   const payload = { sub: user._id.toString(), role: user.role };
   const secret = process.env.JWT_SECRET;
@@ -17,22 +37,35 @@ function signToken(user) {
 
 async function signup(req, res, next) {
   try {
-    const { name, email, phone = '', password, role = 'user' } = req.body;
+    const {
+      name,
+      email,
+      phone = '',
+      password,
+      role = 'user',
+      creatorAdminEmail = '',
+      creatorAdminPassword = '',
+    } = req.body;
+
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
     if (!roles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
     if (role === 'admin') {
-      return res.status(403).json({ message: 'Admin signup is disabled. Use fixed admin credentials.' });
+      const validAuthorizer = await isValidAdminAuthorizer(creatorAdminEmail, creatorAdminPassword);
+      if (!validAuthorizer) {
+        return res.status(403).json({ message: 'Valid existing admin email and password are required to create an admin account.' });
+      }
     }
 
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(409).json({ message: 'Email already registered' });
     }
 
-    const user = await User.create({ name, email, phone, password, role });
+    const user = await User.create({ name, email: normalizedEmail, phone, password, role });
     const token = signToken(user);
 
     res.status(201).json({
@@ -47,20 +80,29 @@ async function signup(req, res, next) {
 async function login(req, res, next) {
   try {
     const { email, password, role } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
     if (role === 'admin') {
-      if (email !== FIXED_ADMIN_EMAIL || password !== FIXED_ADMIN_PASSWORD) {
-        return res.status(401).json({ message: 'Incorrect admin id or password' });
-      }
+      let adminUser = await User.findOne({ email: normalizedEmail, role: 'admin' });
 
-      let adminUser = await User.findOne({ email: FIXED_ADMIN_EMAIL, role: 'admin' });
-      if (!adminUser) {
-        adminUser = await User.create({
-          name: 'Agri Admin',
-          email: FIXED_ADMIN_EMAIL,
-          password: FIXED_ADMIN_PASSWORD,
-          role: 'admin',
-        });
+      if (normalizedEmail === FIXED_ADMIN_EMAIL && password === FIXED_ADMIN_PASSWORD) {
+        if (!adminUser) {
+          adminUser = await User.create({
+            name: 'Agri Admin',
+            email: FIXED_ADMIN_EMAIL,
+            password: FIXED_ADMIN_PASSWORD,
+            role: 'admin',
+          });
+        }
+      } else {
+        if (!adminUser) {
+          return res.status(401).json({ message: 'Incorrect admin id or password' });
+        }
+
+        const match = await adminUser.comparePassword(password);
+        if (!match) {
+          return res.status(401).json({ message: 'Incorrect admin id or password' });
+        }
       }
 
       const adminToken = signToken(adminUser);
@@ -70,7 +112,7 @@ async function login(req, res, next) {
       });
     }
 
-    const user = await User.findOne({ email, ...(role ? { role } : {}) });
+    const user = await User.findOne({ email: normalizedEmail, ...(role ? { role } : {}) });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }

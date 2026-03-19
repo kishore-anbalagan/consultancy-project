@@ -99,4 +99,22 @@ async function getAdminAppointments(req, res, next) {
   }
 }
 
-module.exports = { createAppointment, getAdminAppointments };
+async function deleteAdminAppointment(req, res, next) {
+  try {
+    const { appointmentId } = req.params;
+    const deleted = await Appointment.findByIdAndDelete(appointmentId).lean();
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+
+    return res.json({
+      message: 'Appointment deleted successfully',
+      id: deleted._id,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { createAppointment, getAdminAppointments, deleteAdminAppointment };

@@ -256,4 +256,22 @@ async function getMyOrders(req, res, next) {
   }
 }
 
-module.exports = { createOrder, createRazorpayOrder, verifyRazorpayPayment, getAdminOrders, getMyOrders };
+async function deleteAdminOrder(req, res, next) {
+  try {
+    const { orderId } = req.params;
+    const deleted = await Order.findByIdAndDelete(orderId).lean();
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    return res.json({
+      message: 'Order deleted successfully',
+      id: deleted._id,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { createOrder, createRazorpayOrder, verifyRazorpayPayment, getAdminOrders, getMyOrders, deleteAdminOrder };

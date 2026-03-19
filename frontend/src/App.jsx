@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import products from './data/products';
 
 const testimonials = [
-  { name: 'Ramlal Patil', text: 'Agriclinic transformed my farming! Their products are top-notch.' },
-  { name: 'Radhakisan Kale', text: 'The expert advice helped me boost my crop yield significantly.' },
-  { name: 'Malanbai Sanap', text: 'Great variety of products and easy online ordering experience!' },
-  { name: 'Bappusaheb Gayakwad', text: 'I love the quality! They really care about sustainable farming.' },
+  { text: 'I used the recommended spray plan on my cotton field and saw healthier leaves within the first week. Clear instructions and no confusion.' },
+  { text: 'Ordering from mobile was easy, and the advisor called me back the same evening. The support felt practical, not generic.' },
+  { text: 'The fertilizer combo worked well for my tomato crop this season. Plants looked stronger and flowering improved noticeably.' },
+  { text: 'Packaging was secure, delivery was on time, and product quality matched what was shown. I will reorder for the next cycle.' },
+  { text: 'I was unsure about dosage at first, but the guidance was clear and simple. My chili plants recovered quickly after pest stress.' },
 ];
 
 const whyChooseUs = [
@@ -31,9 +32,10 @@ const heroImages = [
   'https://img.freepik.com/premium-photo/village-old-farmer-is-working-green-planting-paddy-seeds-weed-out-grass_709167-309.jpg',
 ];
 
-function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange, onGoogleContinue, googleClientId }) {
+function SignInSection({ onSignIn, onCreateAccount, onReturnToSite, role = 'user', onRoleChange, onGoogleContinue, googleClientId }) {
   const [signInError, setSignInError] = useState('');
   const [signInLoading, setSignInLoading] = useState(false);
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
   const googleButtonRef = useRef(null);
 
   useEffect(() => {
@@ -146,8 +148,26 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange,
               <h3 style={{ margin: 0, fontSize: '1.6rem', color: '#0f172a', fontFamily: "'Playfair Display', 'Georgia', serif" }}>Welcome back</h3>
               <p style={{ margin: '0.4rem 0 0 0', color: '#64748b' }}>Sign in to continue your farm journey.</p>
             </div>
-            <div style={{ padding: '0.4rem 0.8rem', background: '#ecfeff', color: '#0f766e', borderRadius: '999px', fontWeight: 700, fontSize: '0.85rem' }}>
-              {role === 'admin' ? 'Admin' : 'Member'}
+            <div style={{ display: 'grid', justifyItems: 'end', gap: '0.55rem' }}>
+              <button
+                type="button"
+                onClick={onReturnToSite}
+                style={{
+                  padding: '0.5rem 0.9rem',
+                  borderRadius: '0.65rem',
+                  border: '1px solid #cbd5e1',
+                  background: '#fff',
+                  color: '#334155',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                }}
+              >
+                Return to site
+              </button>
+              <div style={{ padding: '0.4rem 0.8rem', background: '#ecfeff', color: '#0f766e', borderRadius: '999px', fontWeight: 700, fontSize: '0.85rem' }}>
+                {role === 'admin' ? 'Admin' : 'Member'}
+              </div>
             </div>
           </div>
 
@@ -230,13 +250,22 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange,
             </label>
             <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600, color: '#0f172a' }}>
               Password
-              <input
-                type="password"
-                name="password"
-                placeholder="Enter your password"
-                required
-                style={{ padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type={showSignInPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Enter your password"
+                  required
+                  style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSignInPassword((prev) => !prev)}
+                  style={{ padding: '0.58rem 0.8rem', borderRadius: '0.65rem', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', fontWeight: 700, minWidth: '62px' }}
+                >
+                  {showSignInPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </label>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -286,6 +315,9 @@ function SignInSection({ onSignIn, onCreateAccount, role = 'user', onRoleChange,
 function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) {
   const [signUpError, setSignUpError] = useState('');
   const [signUpLoading, setSignUpLoading] = useState(false);
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [showSignUpConfirmPassword, setShowSignUpConfirmPassword] = useState(false);
+  const [showCreatorAdminPassword, setShowCreatorAdminPassword] = useState(false);
 
   return (
     <section
@@ -421,9 +453,16 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
               const email = String(formData.get('email') || '').trim();
               const password = String(formData.get('password') || '');
               const confirmPassword = String(formData.get('confirmPassword') || '');
+              const creatorAdminEmail = String(formData.get('creatorAdminEmail') || '').trim();
+              const creatorAdminPassword = String(formData.get('creatorAdminPassword') || '');
 
               if (password !== confirmPassword) {
                 setSignUpError('Passwords do not match.');
+                return;
+              }
+
+              if (role === 'admin' && (!creatorAdminEmail || !creatorAdminPassword)) {
+                setSignUpError('Existing admin email and password are required to create an admin account.');
                 return;
               }
 
@@ -432,7 +471,7 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
               const phone = String(formData.get('phone') || '').trim();
 
               try {
-                await onSignUp?.({ role, name, email, phone, password });
+                await onSignUp?.({ role, name, email, phone, password, creatorAdminEmail, creatorAdminPassword });
               } catch (err) {
                 setSignUpError(err.message || 'Sign up failed. Please try again.');
               } finally {
@@ -476,24 +515,75 @@ function SignUpSection({ onSignUp, onSignInLink, role = 'user', onRoleChange }) 
             </label>
             <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600, color: '#0f172a' }}>
               Password
-              <input
-                type="password"
-                name="password"
-                placeholder="Create a password"
-                required
-                style={{ padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type={showSignUpPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Create a password"
+                  required
+                  style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSignUpPassword((prev) => !prev)}
+                  style={{ padding: '0.58rem 0.8rem', borderRadius: '0.65rem', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', fontWeight: 700, minWidth: '62px' }}
+                >
+                  {showSignUpPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </label>
             <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600, color: '#0f172a' }}>
               Confirm password
-              <input
-                type="password"
-                name="confirmPassword"
-                placeholder="Re-enter password"
-                required
-                style={{ padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type={showSignUpConfirmPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  placeholder="Re-enter password"
+                  required
+                  style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSignUpConfirmPassword((prev) => !prev)}
+                  style={{ padding: '0.58rem 0.8rem', borderRadius: '0.65rem', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', fontWeight: 700, minWidth: '62px' }}
+                >
+                  {showSignUpConfirmPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </label>
+            {role === 'admin' && (
+              <>
+                <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600, color: '#0f172a' }}>
+                  Existing admin email
+                  <input
+                    type="email"
+                    name="creatorAdminEmail"
+                    placeholder="Current admin email"
+                    required
+                    style={{ padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                  />
+                </label>
+                <label style={{ display: 'grid', gap: '0.45rem', fontWeight: 600, color: '#0f172a' }}>
+                  Existing admin password
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type={showCreatorAdminPassword ? 'text' : 'password'}
+                      name="creatorAdminPassword"
+                      placeholder="Current admin password"
+                      required
+                      style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', background: '#fff' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatorAdminPassword((prev) => !prev)}
+                      style={{ padding: '0.58rem 0.8rem', borderRadius: '0.65rem', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', cursor: 'pointer', fontWeight: 700, minWidth: '62px' }}
+                    >
+                      {showCreatorAdminPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                </label>
+              </>
+            )}
             {signUpError && (
               <div style={{ color: '#dc2626', fontSize: '0.9rem', fontWeight: 600 }}>
                 {signUpError}
@@ -695,6 +785,8 @@ export default function App() {
   const [adminOrders, setAdminOrders] = useState([]);
   const [adminOrderStats, setAdminOrderStats] = useState({ totalOrders: 0, totalBuyers: 0 });
   const [adminOrdersLoading, setAdminOrdersLoading] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState('');
+  const [confirmOrderDeleteId, setConfirmOrderDeleteId] = useState('');
   const [userOrders, setUserOrders] = useState([]);
   const [userOrdersLoading, setUserOrdersLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -737,6 +829,8 @@ export default function App() {
   const [appointmentSubmitted, setAppointmentSubmitted] = useState(false);
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [deletingAppointmentId, setDeletingAppointmentId] = useState('');
+  const [confirmAppointmentDeleteId, setConfirmAppointmentDeleteId] = useState('');
   const [appointmentSubmitting, setAppointmentSubmitting] = useState(false);
   const [showDiseaseDetection, setShowDiseaseDetection] = useState(false);
   const [diseaseImage, setDiseaseImage] = useState(null);
@@ -1013,6 +1107,22 @@ export default function App() {
     fetchUserOrders();
   }, [showUserDashboard, currentUser?.role]);
 
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      setShowCart(false);
+      setCart({});
+    }
+  }, [currentUser?.role]);
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin' && showDiseaseDetection) {
+      setShowDiseaseDetection(false);
+      setPredictedDisease(null);
+      setDiseaseImage(null);
+      setDiseaseImageFile(null);
+    }
+  }, [currentUser?.role, showDiseaseDetection]);
+
   const handleOpenDashboard = () => {
     setShowProfileMenu(false);
     setShowSignIn(false);
@@ -1036,6 +1146,10 @@ export default function App() {
     setAdminOrders([]);
     setAdminOrderStats({ totalOrders: 0, totalBuyers: 0 });
     setUserOrders([]);
+    setDeletingOrderId('');
+    setDeletingAppointmentId('');
+    setConfirmOrderDeleteId('');
+    setConfirmAppointmentDeleteId('');
     setShowProfileMenu(false);
     setShowAdminDashboard(false);
     setShowUserDashboard(false);
@@ -1045,6 +1159,7 @@ export default function App() {
     setActiveSection('home');
     setChatMessages([{ role: 'assistant', text: DEFAULT_CHAT_GREETING }]);
     setGuestPromptsRemaining(null);
+    showToast('Logged out successfully.');
   };
 
   const categories = useMemo(() => ['all', ...Array.from(new Set(productsData.map((p) => p.category)))], [productsData]);
@@ -1106,6 +1221,11 @@ export default function App() {
   }, 0);
 
   const addToCart = (productId) => {
+    if (currentUser?.role === 'admin') {
+      handleOpenDashboard();
+      return;
+    }
+
     setCart((prev) => ({
       ...prev,
       [productId]: (prev[productId] || 0) + 1,
@@ -1113,6 +1233,11 @@ export default function App() {
   };
 
   const handleBuyNow = (productId) => {
+    if (currentUser?.role === 'admin') {
+      handleOpenDashboard();
+      return;
+    }
+
     addToCart(productId);
     setShowCart(true);
   };
@@ -1136,6 +1261,11 @@ export default function App() {
     .filter(Boolean);
 
   const handleCheckout = async () => {
+    if (currentUser?.role === 'admin') {
+      showToast('Admin account cannot checkout. Switch to a user account to buy products.', 'error');
+      return;
+    }
+
     if (!currentUser) {
       showToast('Please sign in to place an order.', 'error');
       setShowSignIn(true);
@@ -1322,6 +1452,11 @@ export default function App() {
   const handleAppointmentSubmit = async (event) => {
     event.preventDefault();
 
+    if (currentUser?.role === 'admin') {
+      showToast('Appointment booking is available for users only.', 'error');
+      return;
+    }
+
     if (!currentUser) {
       showToast('Please sign in to book an appointment.', 'error');
       setShowSignIn(true);
@@ -1355,6 +1490,62 @@ export default function App() {
       showToast(err.message || 'Failed to submit appointment', 'error');
     } finally {
       setAppointmentSubmitting(false);
+    }
+  };
+
+  const handleAdminDeleteOrder = async (orderId) => {
+    if (!orderId) {
+      return;
+    }
+
+    if (confirmOrderDeleteId !== orderId) {
+      setConfirmOrderDeleteId(orderId);
+      showToast('Tap delete again to confirm order removal.', 'error');
+      return;
+    }
+
+    setConfirmOrderDeleteId('');
+    setDeletingOrderId(orderId);
+    try {
+      await apiRequest(`/orders/admin/${orderId}`, { method: 'DELETE' });
+      setAdminOrders((prev) => {
+        const nextOrders = prev.filter((item) => item._id !== orderId);
+        setAdminOrderStats({
+          totalOrders: nextOrders.length,
+          totalBuyers: new Set(nextOrders.map((item) => String(item.user))).size,
+        });
+        return nextOrders;
+      });
+      showToast('Order deleted successfully.');
+    } catch (err) {
+      showToast(err.message || 'Failed to delete order', 'error');
+    } finally {
+      setDeletingOrderId('');
+    }
+  };
+
+  const handleAdminDeleteAppointment = async (appointmentId) => {
+    if (!appointmentId) {
+      return;
+    }
+
+    const appointmentKey = String(appointmentId);
+    if (confirmAppointmentDeleteId !== appointmentKey) {
+      setConfirmAppointmentDeleteId(appointmentKey);
+      showToast('Tap delete again to confirm appointment removal.', 'error');
+      return;
+    }
+
+    setConfirmAppointmentDeleteId('');
+    setDeletingAppointmentId(appointmentKey);
+    try {
+      await apiRequest(`/appointments/admin/${appointmentId}`, { method: 'DELETE' });
+      setAppointments((prev) => prev.filter((item) => String(item._id || item.id) !== appointmentKey));
+      showToast('Appointment deleted successfully.');
+    } catch (err) {
+      showToast(err.message || 'Failed to delete appointment', 'error');
+    } finally {
+      setDeletingAppointmentId('');
     }
   };
 
@@ -1501,9 +1692,11 @@ export default function App() {
 
   const locationOptions = ['Pune', 'Nashik', 'Nagpur', 'Kolhapur', 'Sangli', 'Satara', 'Ahmednagar', 'Solapur', 'Amravati', 'Aurangabad'];
   const todayISO = new Date().toISOString().split('T')[0];
+  const isAdminUser = currentUser?.role === 'admin';
   const isAuthPage = showSignIn || showSignUp;
-  const canUseDiseaseDetection = Boolean(currentUser);
+  const canUseDiseaseDetection = currentUser?.role === 'user';
   const showDiseasePage = showDiseaseDetection && canUseDiseaseDetection;
+  const showTopNavigation = !showAdminDashboard && !showUserDashboard;
   const showFullPage = !showSignIn && !showSignUp && !showAdminDashboard && !showUserDashboard && !showDiseasePage;
 
   const adminFilteredProducts = useMemo(() => {
@@ -1586,47 +1779,61 @@ export default function App() {
       )}
 
       {/* Navigation Bar */}
-      <nav style={{ background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <h1 style={{ fontSize: '1.5rem', margin: 0, color: '#059669', fontWeight: 700, cursor: 'pointer' }} onClick={() => scrollToSection('home')}>
-            🌾 Agri-Clinic
-          </h1>
-          
-          {!isAuthPage && (
-            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <button onClick={() => scrollToSection('home')} style={{ background: 'none', border: 'none', color: activeSection === 'home' ? '#059669' : '#6b7280', fontWeight: activeSection === 'home' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Home</button>
-            <button onClick={() => scrollToSection('about')} style={{ background: 'none', border: 'none', color: activeSection === 'about' ? '#059669' : '#6b7280', fontWeight: activeSection === 'about' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>About Us</button>
-            <button onClick={() => scrollToSection('explore')} style={{ background: 'none', border: 'none', color: activeSection === 'explore' ? '#059669' : '#6b7280', fontWeight: activeSection === 'explore' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Explore</button>
-            <button onClick={() => scrollToSection('reviews')} style={{ background: 'none', border: 'none', color: activeSection === 'reviews' ? '#059669' : '#6b7280', fontWeight: activeSection === 'reviews' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Reviews</button>
-            <button onClick={() => scrollToSection('gallery')} style={{ background: 'none', border: 'none', color: activeSection === 'gallery' ? '#059669' : '#6b7280', fontWeight: activeSection === 'gallery' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Gallery</button>
-            <button onClick={() => scrollToSection('contact')} style={{ background: 'none', border: 'none', color: activeSection === 'contact' ? '#059669' : '#6b7280', fontWeight: activeSection === 'contact' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Contact</button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!currentUser) {
-                  showToast('Sign in to check disease.', 'error');
-                  return;
-                }
+      {showTopNavigation && (
+        <nav style={{ background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'sticky', top: 0, zIndex: 100 }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem 2rem', display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: '1rem' }}>
+            <h1 style={{ fontSize: '1.5rem', margin: 0, color: '#059669', fontWeight: 700, cursor: 'pointer' }} onClick={() => scrollToSection('home')}>
+              🌾 Agri-Clinic
+            </h1>
 
-                setShowDiseaseDetection(true);
-                setShowSignIn(false);
-                setShowSignUp(false);
-                setShowAdminDashboard(false);
-                setActiveSection('disease');
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#6b7280',
-                fontWeight: 500,
-                cursor: 'pointer',
-                fontSize: '1rem',
-              }}
-            >
-              🔍 Disease Check
-            </button>
-            {currentUser ? (
-              <div ref={profileMenuRef} style={{ position: 'relative' }}>
+            {!isAuthPage && (
+              <>
+                <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
+                  <button onClick={() => scrollToSection('home')} style={{ background: 'none', border: 'none', color: activeSection === 'home' ? '#059669' : '#6b7280', fontWeight: activeSection === 'home' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Home</button>
+                  <button onClick={() => scrollToSection('about')} style={{ background: 'none', border: 'none', color: activeSection === 'about' ? '#059669' : '#6b7280', fontWeight: activeSection === 'about' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>About Us</button>
+                  <button onClick={() => scrollToSection('explore')} style={{ background: 'none', border: 'none', color: activeSection === 'explore' ? '#059669' : '#6b7280', fontWeight: activeSection === 'explore' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Explore</button>
+                  <button onClick={() => scrollToSection('reviews')} style={{ background: 'none', border: 'none', color: activeSection === 'reviews' ? '#059669' : '#6b7280', fontWeight: activeSection === 'reviews' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Reviews</button>
+                  <button onClick={() => scrollToSection('gallery')} style={{ background: 'none', border: 'none', color: activeSection === 'gallery' ? '#059669' : '#6b7280', fontWeight: activeSection === 'gallery' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Gallery</button>
+                  <button onClick={() => scrollToSection('contact')} style={{ background: 'none', border: 'none', color: activeSection === 'contact' ? '#059669' : '#6b7280', fontWeight: activeSection === 'contact' ? 700 : 500, cursor: 'pointer', fontSize: '1rem' }}>Contact</button>
+                  {!isAdminUser && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!currentUser) {
+                          showToast('Sign in to check disease.', 'error');
+                          return;
+                        }
+
+                        setShowDiseaseDetection(true);
+                        setShowSignIn(false);
+                        setShowSignUp(false);
+                        setShowAdminDashboard(false);
+                        setActiveSection('disease');
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.4rem 0.9rem',
+                        borderRadius: '999px',
+                        border: activeSection === 'disease' ? '1px solid #0f766e' : '1px solid #99f6e4',
+                        background: activeSection === 'disease' ? 'linear-gradient(120deg, #0f766e, #059669)' : 'linear-gradient(120deg, #ecfeff, #f0fdf4)',
+                        color: activeSection === 'disease' ? '#fff' : '#0f766e',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontSize: '0.92rem',
+                        boxShadow: activeSection === 'disease' ? '0 8px 18px rgba(15, 118, 110, 0.28)' : 'none',
+                      }}
+                    >
+                      <span style={{ fontSize: '1rem', lineHeight: 1 }}>🔍</span>
+                      Disease Check
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifySelf: 'end' }}>
+                  {currentUser ? (
+                    <div ref={profileMenuRef} style={{ position: 'relative' }}>
                 <button
                   type="button"
                   onClick={() => setShowProfileMenu((prev) => !prev)}
@@ -1715,73 +1922,77 @@ export default function App() {
                     </button>
                   </div>
                 )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDiseaseDetection(false);
-                  setShowAdminDashboard(false);
-                  setShowSignUp(false);
-                  setSignInRole('user');
-                  setShowSignIn(true);
-                }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '999px',
-                  border: '1px solid #059669',
-                  background: '#ecfdf5',
-                  color: '#047857',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                }}
-              >
-                Account
-              </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDiseaseDetection(false);
+                        setShowAdminDashboard(false);
+                        setShowSignUp(false);
+                        setSignInRole('user');
+                        setShowSignIn(true);
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '999px',
+                        border: '1px solid #059669',
+                        background: '#ecfdf5',
+                        color: '#047857',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      Account
+                    </button>
+                  )}
+                  {!isAdminUser && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCart(!showCart)}
+                      style={{
+                        position: 'relative',
+                        padding: '0.6rem 1rem',
+                        borderRadius: '0.5rem',
+                        background: '#059669',
+                        color: '#fff',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: '1rem',
+                      }}
+                    >
+                      🛒
+                      {cartCount > 0 && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            background: '#dc2626',
+                            color: '#fff',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {cartCount}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </>
             )}
-            <button
-              type="button"
-              onClick={() => setShowCart(!showCart)}
-              style={{
-                position: 'relative',
-                padding: '0.6rem 1rem',
-                borderRadius: '0.5rem',
-                background: '#059669',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '1rem',
-              }}
-            >
-              🛒
-              {cartCount > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    right: '-8px',
-                    background: '#dc2626',
-                    color: '#fff',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                  }}
-                >
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            </div>
-          )}
-        </div>
-      </nav>
+          </div>
+        </nav>
+      )}
 
       {showSignIn && (
         <SignInSection
@@ -1789,6 +2000,15 @@ export default function App() {
           onRoleChange={setSignInRole}
           onGoogleContinue={handleGoogleContinue}
           googleClientId={googleClientId}
+          onReturnToSite={() => {
+            setShowSignIn(false);
+            setShowSignUp(false);
+            setShowDiseaseDetection(false);
+            setShowAdminDashboard(false);
+            setShowUserDashboard(false);
+            setActiveSection('home');
+            requestAnimationFrame(() => scrollToSection('home'));
+          }}
           onCreateAccount={() => {
             setShowSignIn(false);
             setShowDiseaseDetection(false);
@@ -1811,8 +2031,16 @@ export default function App() {
             setShowDiseaseDetection(false);
             setShowSignIn(true);
           }}
-          onSignUp={async ({ role, name, email, phone, password }) => {
-            const data = await authRequest('/auth/signup', { name, email, phone, password, role });
+          onSignUp={async ({ role, name, email, phone, password, creatorAdminEmail, creatorAdminPassword }) => {
+            const data = await authRequest('/auth/signup', {
+              name,
+              email,
+              phone,
+              password,
+              role,
+              creatorAdminEmail,
+              creatorAdminPassword,
+            });
             if (!data?.user?.id) {
               throw new Error('Signup failed. Please try again.');
             }
@@ -1871,7 +2099,6 @@ export default function App() {
               {[
                 { title: 'Total Orders', value: `${adminOrderStats.totalOrders}`, note: 'Orders from all users' },
                 { title: 'Total Buyers', value: `${adminOrderStats.totalBuyers}`, note: 'Unique customers' },
-                { title: 'Low Stock Items', value: '6', note: 'Reorder today' },
                 { title: 'Appointments Pending', value: `${pendingAppointments.length}`, note: 'New requests' },
               ].map((item) => (
                 <div key={item.title} style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '1rem', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.12)' }}>
@@ -1898,7 +2125,30 @@ export default function App() {
                     <div key={order._id} style={{ display: 'grid', gap: '0.35rem', background: 'rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.12)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                         <div style={{ fontWeight: 700 }}>{order.userSnapshot?.name || 'Customer'}</div>
-                        <span style={{ padding: '0.2rem 0.7rem', borderRadius: '999px', background: 'rgba(16,185,129,0.2)', color: '#bbf7d0', fontWeight: 700, fontSize: '0.75rem' }}>{order.status || 'placed'}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                          <span style={{ padding: '0.2rem 0.7rem', borderRadius: '999px', background: 'rgba(16,185,129,0.2)', color: '#bbf7d0', fontWeight: 700, fontSize: '0.75rem' }}>{order.status || 'placed'}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmAppointmentDeleteId('');
+                              handleAdminDeleteOrder(order._id);
+                            }}
+                            disabled={deletingOrderId === order._id}
+                            style={{
+                              padding: '0.25rem 0.65rem',
+                              borderRadius: '999px',
+                              border: '1px solid rgba(248,113,113,0.65)',
+                              background: 'rgba(127,29,29,0.3)',
+                              color: '#fecaca',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              cursor: deletingOrderId === order._id ? 'not-allowed' : 'pointer',
+                              opacity: deletingOrderId === order._id ? 0.75 : 1,
+                            }}
+                          >
+                            {deletingOrderId === order._id ? 'Deleting...' : confirmOrderDeleteId === order._id ? 'Confirm' : 'Delete'}
+                          </button>
+                        </div>
                       </div>
                       <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>{order.userSnapshot?.email || 'No email'} · {order.userSnapshot?.phone || 'No phone'}</div>
                       <div style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
@@ -1928,7 +2178,34 @@ export default function App() {
                     <div key={item._id || item.id} style={{ display: 'grid', gap: '0.35rem', background: 'rgba(255,255,255,0.06)', borderRadius: '0.75rem', padding: '0.75rem', border: '1px solid rgba(255,255,255,0.12)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                         <div style={{ fontWeight: 700 }}>{item.name || 'Farmer'}</div>
-                        <span style={{ padding: '0.2rem 0.7rem', borderRadius: '999px', background: 'rgba(250,204,21,0.2)', color: '#fde68a', fontWeight: 700, fontSize: '0.75rem' }}>{item.status}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                          <span style={{ padding: '0.2rem 0.7rem', borderRadius: '999px', background: 'rgba(250,204,21,0.2)', color: '#fde68a', fontWeight: 700, fontSize: '0.75rem' }}>{item.status}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmOrderDeleteId('');
+                              handleAdminDeleteAppointment(item._id || item.id);
+                            }}
+                            disabled={deletingAppointmentId === String(item._id || item.id)}
+                            style={{
+                              padding: '0.25rem 0.65rem',
+                              borderRadius: '999px',
+                              border: '1px solid rgba(248,113,113,0.65)',
+                              background: 'rgba(127,29,29,0.3)',
+                              color: '#fecaca',
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              cursor: deletingAppointmentId === String(item._id || item.id) ? 'not-allowed' : 'pointer',
+                              opacity: deletingAppointmentId === String(item._id || item.id) ? 0.75 : 1,
+                            }}
+                          >
+                            {deletingAppointmentId === String(item._id || item.id)
+                              ? 'Deleting...'
+                              : confirmAppointmentDeleteId === String(item._id || item.id)
+                                ? 'Confirm'
+                                : 'Delete'}
+                          </button>
+                        </div>
                       </div>
                       <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>{item.service} · {item.date || 'No date'} {item.time || ''}</div>
                       <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.phone || 'No phone'} · {item.contactMethod}</div>
@@ -2460,19 +2737,19 @@ export default function App() {
                       <div style={{ fontSize: '0.9rem', color: '#cbd5f5', marginBottom: '0.8rem' }}>INR {product.price}</div>
                       <button
                         type="button"
-                        onClick={() => handleBuyNow(product.id)}
+                        onClick={() => (isAdminUser ? handleOpenDashboard() : handleBuyNow(product.id))}
                         style={{
                           width: '100%',
                           padding: '0.6rem',
                           borderRadius: '0.5rem',
-                          background: '#059669',
+                          background: isAdminUser ? '#0f766e' : '#059669',
                           color: '#fff',
                           border: 'none',
                           cursor: 'pointer',
                           fontWeight: 600,
                         }}
                       >
-                        Add to Cart
+                        {isAdminUser ? 'Edit' : 'Add to Cart'}
                       </button>
                     </div>
                   ))}
@@ -2486,7 +2763,7 @@ export default function App() {
       {showFullPage && (
         <>
           {/* Cart Drawer */}
-          {showCart && (
+          {showCart && !isAdminUser && (
             <div
               style={{
                 position: 'fixed',
@@ -2668,19 +2945,19 @@ export default function App() {
                     <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#059669' }}>INR {selectedProduct.price}</div>
                     <button
                       type="button"
-                      onClick={() => addToCart(selectedProduct.id)}
+                      onClick={() => (isAdminUser ? handleOpenDashboard() : addToCart(selectedProduct.id))}
                       disabled={selectedProduct.stock === 0}
                       style={{
                         padding: '0.7rem 1.6rem',
                         borderRadius: '0.6rem',
-                        background: selectedProduct.stock > 0 ? '#059669' : '#d1d5db',
+                        background: isAdminUser ? '#0f766e' : selectedProduct.stock > 0 ? '#059669' : '#d1d5db',
                         color: '#fff',
                         border: 'none',
-                        cursor: selectedProduct.stock > 0 ? 'pointer' : 'not-allowed',
+                        cursor: isAdminUser ? 'pointer' : selectedProduct.stock > 0 ? 'pointer' : 'not-allowed',
                         fontWeight: 700,
                       }}
                     >
-                      Add to Cart
+                      {isAdminUser ? 'Edit' : 'Add to Cart'}
                     </button>
                   </div>
                 </div>
@@ -2730,7 +3007,7 @@ export default function App() {
                 Your one-stop solution for premium pesticides, herbicides, and fertilizers. Empower your farm with quality products and expert guidance.
               </p>
               <button onClick={() => scrollToSection('explore')} style={{ padding: '0.8rem 2rem', background: '#fff', color: '#059669', border: 'none', borderRadius: '0.5rem', fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer' }}>
-                Shop Now
+                {isAdminUser ? 'View Catalog' : 'Shop Now'}
               </button>
             </div>
           </section>
@@ -2880,19 +3157,19 @@ export default function App() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleBuyNow(p.id)}
+                        onClick={() => (isAdminUser ? handleOpenDashboard() : handleBuyNow(p.id))}
                         disabled={p.stock === 0}
                         style={{
                           padding: '0.6rem',
                           borderRadius: '0.5rem',
-                          background: p.stock > 0 ? '#059669' : '#d1d5db',
+                          background: isAdminUser ? '#0f766e' : p.stock > 0 ? '#059669' : '#d1d5db',
                           color: '#fff',
                           border: 'none',
-                          cursor: p.stock > 0 ? 'pointer' : 'not-allowed',
+                          cursor: isAdminUser ? 'pointer' : p.stock > 0 ? 'pointer' : 'not-allowed',
                           fontWeight: 600,
                         }}
                       >
-                        Buy now
+                        {isAdminUser ? 'Edit' : 'Buy now'}
                       </button>
                     </div>
                   </div>
@@ -2922,16 +3199,12 @@ export default function App() {
           <section id="reviews" style={{ padding: '3rem 2rem', marginBottom: '3rem' }}>
             <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
               <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#1f2937', textAlign: 'center' }}>What Our Customers Say</h2>
-              <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '2rem' }}>Real experiences from farmers who trust us.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
+              <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '2rem' }}>Real stories from farmer feedback.</p>
+              <div className="reviews-grid">
                 {testimonials.map((t, i) => (
-                  <div key={i} style={{ background: '#fff', padding: '1.5rem', borderRadius: '0.75rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderLeft: '4px solid #059669' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                      <span style={{ color: '#f59e0b', fontWeight: 700 }}>★★★★★</span>
-                      <span style={{ color: '#f59e0b', fontSize: '0.9rem', fontWeight: 600 }}>5.0</span>
-                    </div>
-                    <p style={{ margin: '0 0 1rem 0', color: '#4b5563', lineHeight: 1.6, fontStyle: 'italic' }}>"{t.text}"</p>
-                    <p style={{ margin: 0, fontWeight: 700, color: '#059669' }}>— {t.name}</p>
+                  <div key={i} className="review-card" style={{ background: '#fff', padding: '1.5rem', borderRadius: '0.75rem', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderLeft: '4px solid #059669', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <p style={{ margin: '0 0 1rem 0', color: '#4b5563', lineHeight: 1.6, fontStyle: 'italic', flexGrow: 1 }}>"{t.text}"</p>
+                    <p style={{ margin: 0, fontWeight: 700, color: '#059669', fontSize: '0.9rem' }}>Farmer review</p>
                   </div>
                 ))}
               </div>
@@ -2945,7 +3218,7 @@ export default function App() {
               <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '2rem' }}>
                 Talk to our agronomy experts for crop planning, pest control, and nutrient management.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', alignItems: 'stretch' }}>
                 <div style={{ padding: '1.5rem', background: '#f9fafb', borderRadius: '0.75rem', border: '1px solid #e5e7eb' }}>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>Soil & Crop Advisory</h3>
                   <p style={{ margin: 0, color: '#4b5563', lineHeight: 1.6 }}>
@@ -2964,17 +3237,12 @@ export default function App() {
                     Balanced nutrition schedules to improve yield and reduce input costs.
                   </p>
                 </div>
-                <div style={{ padding: '1.5rem', background: '#f9fafb', borderRadius: '0.75rem', border: '1px solid #e5e7eb' }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>How to Reach Us</h3>
-                  <p style={{ margin: '0 0 0.5rem 0', color: '#4b5563' }}>Call: 9876543210</p>
-                  <p style={{ margin: '0 0 0.5rem 0', color: '#4b5563' }}>Email: consult@agriclinic.com</p>
-                  <p style={{ margin: 0, color: '#4b5563' }}>Hours: Mon-Sat, 9:00 AM - 6:00 PM</p>
-                </div>
               </div>
             </div>
           </section>
 
           {/* APPOINTMENT SECTION */}
+          {!isAdminUser && (
           <section style={{ padding: '3rem 2rem', background: '#f3f4f6', marginBottom: '3rem' }}>
             <div style={{ maxWidth: '720px', margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
@@ -3109,14 +3377,12 @@ export default function App() {
                       <input type="hidden" name="service" value={appointmentForm.service} />
                     </div>
                     <div style={{ marginBottom: '1rem' }}>
-                      <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#1f2937' }}>Preferred contact</div>
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                         {['Phone', 'Email', 'WhatsApp'].map((option) => (
                           <button
                             key={option}
                             type="button"
                             onClick={() => setAppointmentForm((prev) => ({ ...prev, contactMethod: option }))}
-                            aria-pressed={appointmentForm.contactMethod === option}
                             style={{
                               padding: '0.4rem 0.85rem',
                               borderRadius: '999px',
@@ -3174,6 +3440,7 @@ export default function App() {
               </form>
             </div>
           </section>
+          )}
 
           {/* GALLERY SECTION */}
           <section id="gallery" style={{ padding: '3rem 2rem', background: '#f3f4f6', marginBottom: '3rem' }}>
@@ -3216,17 +3483,17 @@ export default function App() {
                 <div style={{ padding: '1.5rem', background: '#f3f4f6', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>📱</p>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>Phone</h3>
-                  <p style={{ margin: 0, color: '#6b7280' }}>6375409877</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>9843699932</p>
                 </div>
                 <div style={{ padding: '1.5rem', background: '#f3f4f6', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>📧</p>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>Email</h3>
-                  <p style={{ margin: 0, color: '#6b7280' }}>agri@gmail.com</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>agri.babu21@gmail.com</p>
                 </div>
                 <div style={{ padding: '1.5rem', background: '#f3f4f6', borderRadius: '0.75rem', textAlign: 'center' }}>
                   <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>📍</p>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#059669' }}>Location</h3>
-                  <p style={{ margin: 0, color: '#6b7280' }}>Namakkal</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>P.velur<br></br>Namakkal</p>
                 </div>
               </div>
             </div>
@@ -3235,31 +3502,38 @@ export default function App() {
           {/* Footer */}
           <footer style={{ background: '#1f2937', color: '#9ca3af', padding: '3rem 2rem' }}>
             <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
-                <div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                  gap: '2.25rem',
+                  alignItems: 'start',
+                  marginBottom: '2rem',
+                }}
+              >
+                <div style={{ display: 'grid', alignContent: 'start', gap: '0.85rem' }}>
                   <h3 style={{ margin: '0 0 1rem 0', color: '#fff' }}>🌾 Agri-Clinic</h3>
-                  <p>Empowering farmers with quality products and expert advice.</p>
+                  <p style={{ margin: 0, lineHeight: 1.45 }}>Empowering farmers with quality products and expert advice.</p>
                 </div>
-                <div>
+                <div style={{ display: 'grid', alignContent: 'start', gap: '0.85rem' }}>
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#fff' }}>Quick Links</h4>
-                  <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none' }}>
-                    <li style={{ marginBottom: '0.5rem' }}><a href="#home" style={{ color: '#9ca3af', textDecoration: 'none' }}>Home</a></li>
-                    <li style={{ marginBottom: '0.5rem' }}><a href="#about" style={{ color: '#9ca3af', textDecoration: 'none' }}>About</a></li>
-                    <li style={{ marginBottom: '0.5rem' }}><a href="#explore" style={{ color: '#9ca3af', textDecoration: 'none' }}>Products</a></li>
-                    <li style={{ marginBottom: '0.5rem' }}><a href="#contact" style={{ color: '#9ca3af', textDecoration: 'none' }}>Contact</a></li>
+                  <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'grid', gap: '0.5rem' }}>
+                    <li><a href="#home" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Home</a></li>
+                    <li><a href="#about" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>About</a></li>
+                    <li><a href="#explore" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Products</a></li>
+                    <li><a href="#contact" style={{ color: '#9ca3af', textDecoration: 'none', lineHeight: 1.4 }}>Contact</a></li>
                   </ul>
                 </div>
-                <div>
-                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#fff' }}>Follow Us</h4>
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <a href="#" style={{ color: '#9ca3af', fontSize: '1.2rem' }}>📘</a>
-                    <a href="#" style={{ color: '#9ca3af', fontSize: '1.2rem' }}>🐦</a>
-                    <a href="#" style={{ color: '#9ca3af', fontSize: '1.2rem' }}>📷</a>
-                  </div>
+                <div style={{ display: 'grid', alignContent: 'start', gap: '0.5rem' }}>
+                  <h4 style={{ margin: '0 0 0.75rem 0', color: '#fff' }}>Address</h4>
+                  <p style={{ margin: 0, lineHeight: 1.5 }}>
+                    Rasi Agri Clinic<br></br>
+                    116/1, Panchamuga Vinayagar Kovil Opp, P. Velur, Namakkal Dt, Tamil Nadu
+                  </p>
                 </div>
               </div>
               <div style={{ borderTop: '1px solid #374151', paddingTop: '1.5rem', textAlign: 'center' }}>
-                <p style={{ margin: 0 }}>© 2025 Agri-Clinic. All rights reserved.</p>
+                <p style={{ margin: 0 }}>© 2026 Agri-Clinic. All rights reserved.</p>
               </div>
             </div>
           </footer>
